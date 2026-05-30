@@ -1,23 +1,27 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
-import EmployeeMobileShell from "@/components/employee/EmployeeMobileShell";
+"use client";
 
-export default async function EmployeeShellLayout({
+import EmployeeMobileShell from "@/components/employee/EmployeeMobileShell";
+import AuthGuard from "@/components/auth/AuthGuard";
+import { useAuth } from "@/context/AuthContext";
+
+export default function EmployeeShellLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const session = await getSession();
-  if (!session) redirect("/login?from=/employee/dashboard");
-  if (session.role !== "employee") redirect("/dashboard");
+  const { user } = useAuth();
+
+  if (!user) return null;
 
   return (
-    <EmployeeMobileShell
-      user={{
-        prenom: session.prenom,
-        nom: session.nom,
-        email: session.email,
-      }}
-    >
-      {children}
-    </EmployeeMobileShell>
+    <AuthGuard allowedRoles={["employee"]} redirectTo="/dashboard">
+      <EmployeeMobileShell
+        user={{
+          prenom: user.prenom,
+          nom: user.nom,
+          email: user.email,
+        }}
+      >
+        {children}
+      </EmployeeMobileShell>
+    </AuthGuard>
   );
 }

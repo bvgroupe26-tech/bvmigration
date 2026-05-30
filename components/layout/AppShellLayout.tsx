@@ -1,25 +1,31 @@
-import { redirect } from "next/navigation";
+"use client";
+
 import AdminAppShell from "@/components/layout/AdminAppShell";
 import EmployeePanelGate from "@/components/layout/EmployeePanelGate";
-import { getSession } from "@/lib/auth";
+import AuthGuard from "@/components/auth/AuthGuard";
+import { useAuth } from "@/context/AuthContext";
 
-export default async function AppShellLayout({
+export default function AppShellLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const session = await getSession();
-  if (!session) redirect("/login");
-  if (session.role === "employee") redirect("/employee/dashboard");
+  const { user } = useAuth();
 
-  const user = {
-    email: session.email,
-    nom: session.nom,
-    prenom: session.prenom,
-    role: session.role,
-  };
+  if (!user) return null;
 
   return (
-    <EmployeePanelGate>
-      <AdminAppShell user={user}>{children}</AdminAppShell>
-    </EmployeePanelGate>
+    <AuthGuard allowedRoles={["admin", "manager", "rh"]} redirectTo="/employee/dashboard">
+      <EmployeePanelGate>
+        <AdminAppShell
+          user={{
+            email: user.email,
+            nom: user.nom,
+            prenom: user.prenom,
+            role: user.role,
+          }}
+        >
+          {children}
+        </AdminAppShell>
+      </EmployeePanelGate>
+    </AuthGuard>
   );
 }

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Syne, JetBrains_Mono, DM_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { TitlebarLayoutShell } from "@/components/Titlebar";
+import { AuthProvider } from "@/context/AuthContext";
+import PushNotificationsRoot from "@/components/push/PushNotificationsRoot";
 import PwaInstallPrompt from "@/components/pwa/PwaInstallPrompt";
 import "./globals.css";
 
@@ -69,10 +71,12 @@ export default function RootLayout({
         className="min-h-screen bg-slate-100 font-sans text-text-primary antialiased"
         suppressHydrationWarning
       >
-        <TitlebarLayoutShell>
-          {children}
-          <PwaInstallPrompt />
-          <Toaster
+        <AuthProvider>
+          <TitlebarLayoutShell>
+            <PushNotificationsRoot />
+            {children}
+            <PwaInstallPrompt />
+            <Toaster
             theme="light"
             position="top-right"
             richColors
@@ -87,6 +91,7 @@ export default function RootLayout({
             }}
           />
         </TitlebarLayoutShell>
+        </AuthProvider>
       </body>
     </html>
   );

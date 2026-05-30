@@ -1,18 +1,12 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
 import { UserPlus } from "lucide-react";
-import { getSession } from "@/lib/auth";
-import { getHomeRouteByRole } from "@/lib/session";
 import RegisterEmployeeForm from "@/components/auth/RegisterEmployeeForm";
 import LoginCardEntrance from "@/app/login/LoginCardEntrance";
 
 export const dynamic = "force-dynamic";
 
-export default async function RegisterEmployeePage() {
-  const session = await getSession();
-  if (session) redirect(getHomeRouteByRole(session.role));
-
+export default function RegisterEmployeePage() {
   return (
     <div className="relative min-h-screen bg-slate-100 text-slate-900">
       <header className="flex items-center justify-between border-b border-slate-200/80 bg-white px-6 py-5 lg:px-10">

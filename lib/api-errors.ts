@@ -40,7 +40,7 @@ export function isTechnicalMessage(message: string): boolean {
 }
 
 export function isAuthApiPath(path: string): boolean {
-  return /^\/auth\/(login|register)/.test(path);
+  return /^\/auth\/(login|register|refresh|logout)/.test(path);
 }
 
 export function messageForHttpStatus(status: number, context: ApiErrorContext = "default"): string {

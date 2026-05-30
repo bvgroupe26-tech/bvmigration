@@ -8,12 +8,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Mail, Lock, Eye, EyeOff, User } from "lucide-react";
 import { registerSchema, type RegisterInput } from "@/lib/schemas";
-import { apiFetch, setAuthToken, getUserErrorMessage } from "@/lib/api-client";
+import { apiFetch, getUserErrorMessage } from "@/lib/api-client";
+import { extractAccessToken, setAccessToken } from "@/lib/authClient";
+import { useAuth } from "@/context/AuthContext";
 import Button from "@/components/ui/Button";
 import { Field, Input, NativeSelect } from "@/components/ui/Field";
 
 export default function RegisterForm() {
   const router = useRouter();
+  const { refreshSession } = useAuth();
   const [showPwd, setShowPwd] = useState(false);
   const [showPwd2, setShowPwd2] = useState(false);
 
@@ -46,7 +49,8 @@ export default function RegisterForm() {
         return;
       }
 
-      await setAuthToken(result.data.access_token);
+      setAccessToken(extractAccessToken(result.data));
+      await refreshSession();
       toast.success("Compte créé — vous êtes connecté(e)");
       router.push("/dashboard");
       router.refresh();

@@ -2,7 +2,15 @@
 
 import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
-import { apiDelete, apiDownload, apiPost, apiPut, apiUpload } from "@/lib/api-client";
+import { refreshAccessToken } from "@/lib/authClient";
+import {
+  apiDelete,
+  apiDownload,
+  apiGet,
+  apiPost,
+  apiPut,
+  apiUpload,
+} from "@/lib/apiClient";
 import { normalizeEmployeMe } from "@/lib/employe-utils";
 import {
   normalizeAbsenceBalance,
@@ -153,5 +161,6 @@ export async function downloadDocument(id: number, name?: string) {
 }
 
 export async function refreshAuthToken() {
-  return apiPost<{ access_token: string; user: UserMePayload }>("/auth/refresh-token");
+  await refreshAccessToken();
+  return apiGet<UserMePayload>("/auth/me");
 }

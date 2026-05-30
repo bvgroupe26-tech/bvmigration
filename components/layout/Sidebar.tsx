@@ -10,8 +10,8 @@ import {
 } from "lucide-react";
 import { ADMIN_NAV, isNavActive } from "@/lib/nav-config";
 import { cn, getInitials, getAvatarGradient } from "@/lib/utils";
-import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
-import { clearAuthToken } from "@/lib/api-client";
+import { useAuth } from "@/context/AuthContext";
+import { getUserErrorMessage } from "@/lib/fetcher";
 
 type NavItem = {
   href: string;
@@ -35,13 +35,12 @@ type SidebarProps = {
 export default function Sidebar({ user, className }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { logout } = useAuth();
 
   async function handleLogout() {
     try {
-      await apiClient.post("/auth/logout");
-      await clearAuthToken();
+      await logout();
       toast.success("À bientôt");
-      router.push("/login");
       router.refresh();
     } catch (err) {
       toast.error(getUserErrorMessage(err));

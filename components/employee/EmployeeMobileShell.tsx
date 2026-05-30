@@ -8,11 +8,9 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import BottomNavBar from "@/components/layout/BottomNavBar";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
-import { useUnreadNotificationsCount } from "@/hooks/useNotifications";
-import { EMPLOYEE_NAV, getEmployeePageTitle, isNavActive } from "@/lib/nav-config";
+import { EMPLOYEE_MOBILE_TABS, EMPLOYEE_NAV, getEmployeePageTitle, isNavActive } from "@/lib/nav-config";
+import { useAuth } from "@/context/AuthContext";
 import { cn, getAvatarGradient, getInitials } from "@/lib/utils";
-import { clearAuthToken } from "@/lib/api-client";
-import { apiClient } from "@/lib/fetcher";
 
 type EmployeeMobileShellProps = {
   user: {
@@ -26,21 +24,18 @@ type EmployeeMobileShellProps = {
 export default function EmployeeMobileShell({ user, children }: EmployeeMobileShellProps) {
   const pathname = usePathname() || "/employee/dashboard";
   const router = useRouter();
+  const { logout } = useAuth();
   const title = getEmployeePageTitle(pathname);
   const initials = getInitials(user.nom, user.prenom);
   const gradient = getAvatarGradient(`${user.prenom}${user.nom}`);
-  const { count: unreadCount } = useUnreadNotificationsCount();
 
   async function handleLogout() {
     try {
-      await apiClient.post("/auth/logout");
-      await clearAuthToken();
+      await logout();
       toast.success("À bientôt");
-      router.push("/login");
       router.refresh();
     } catch {
-      await clearAuthToken();
-      router.push("/login");
+      await logout();
     }
   }
 
@@ -187,9 +182,8 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
 
       <BottomNavBar
         className="lg:hidden"
-        items={EMPLOYEE_NAV}
+        items={EMPLOYEE_MOBILE_TABS}
         pathname={pathname}
-        badgeByHref={{ "/employee/notifications": unreadCount }}
       />
     </div>
   );

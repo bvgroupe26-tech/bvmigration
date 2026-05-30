@@ -5,6 +5,9 @@ const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.DISABLE_PWA === "true",
   register: true,
+  sw: "sw.js",
+  customWorkerSrc: "worker",
+  customWorkerDest: "public",
   fallbacks: {
     document: "/offline",
   },

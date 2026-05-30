@@ -8,7 +8,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Mail, Lock, Eye, EyeOff, User, Phone, Briefcase } from "lucide-react";
 import { registerEmployeePwaSchema, type RegisterEmployeePwaInput } from "@/lib/schemas";
-import { apiFetch, setAuthToken, getUserErrorMessage } from "@/lib/api-client";
+import { apiFetch, getUserErrorMessage } from "@/lib/api-client";
+import { extractAccessToken, setAccessToken } from "@/lib/authClient";
+import { useAuth } from "@/context/AuthContext";
 import Button from "@/components/ui/Button";
 import { Field, Input, NativeSelect } from "@/components/ui/Field";
 
@@ -31,6 +33,7 @@ function toApiPayload(data: RegisterEmployeePwaInput) {
 
 export default function RegisterEmployeeForm() {
   const router = useRouter();
+  const { refreshSession } = useAuth();
   const [showPwd, setShowPwd] = useState(false);
   const [showPwd2, setShowPwd2] = useState(false);
   const [showOptional, setShowOptional] = useState(false);
@@ -68,7 +71,8 @@ export default function RegisterEmployeeForm() {
         return;
       }
 
-      await setAuthToken(result.data.access_token);
+      setAccessToken(extractAccessToken(result.data));
+      await refreshSession();
       toast.success("Compte créé — bienvenue !");
       router.push("/employee/dashboard");
       router.refresh();

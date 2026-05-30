@@ -34,6 +34,15 @@ export const EMPLOYEE_NAV: NavItem[] = [
   { href: "/employee/notifications", label: "Notifications", shortLabel: "Alertes", icon: Bell },
 ];
 
+/** Barre du bas PWA employé (mobile) — profil à la place des alertes */
+export const EMPLOYEE_MOBILE_TABS: NavItem[] = [
+  { href: "/employee/dashboard", label: "Accueil", shortLabel: "Accueil", icon: Home },
+  { href: "/employee/presence", label: "Présence", shortLabel: "Présence", icon: Clock },
+  { href: "/employee/leaves", label: "Congés", shortLabel: "Congés", icon: CalendarClock },
+  { href: "/employee/documents", label: "Documents", shortLabel: "Docs", icon: FileText },
+  { href: "/employee/profile", label: "Mon profil", shortLabel: "Profil", icon: User },
+];
+
 export const ADMIN_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/notifications", label: "Notifications", icon: Bell },

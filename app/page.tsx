@@ -1,7 +1,4 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
 import { resolveApiBaseUrl } from "@/lib/resolve-api-url";
-import { getHomeRouteByRole } from "@/lib/session";
 import FloatingBlobs from "@/components/landing/FloatingBlobs";
 import Navbar from "@/components/landing/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
@@ -101,10 +98,6 @@ async function fetchEmployePreview(): Promise<LandingEmployePreview[]> {
 }
 
 export default async function LandingPage() {
-  // Si déjà connecté -> redirect vers route par rôle
-  const session = await getSession();
-  if (session) redirect(getHomeRouteByRole(session.role));
-
   const [stats, presenceChart, employePreview] = await Promise.all([
     fetchPublicStats(),
     fetchPublicPresencesChart(),

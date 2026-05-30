@@ -1,17 +1,11 @@
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import Image from "next/image";
-import { getSession } from "@/lib/auth";
-import { getHomeRouteByRole } from "@/lib/session";
 import LoginForm from "@/components/auth/LoginForm";
 import LoginCardEntrance from "./LoginCardEntrance";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
-  const session = await getSession();
-  if (session) redirect(getHomeRouteByRole(session.role));
-
+export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#F4F7FB] px-6">
       <div className="fixed inset-x-0 top-0 h-0.5 bv-gradient-bar" />

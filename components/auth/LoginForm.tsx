@@ -8,8 +8,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { apiFetch, setAuthToken, getUserErrorMessage } from "@/lib/api-client";
-import { decodeJwtPayload, getHomeRouteByRole } from "@/lib/session";
+import { useAuth } from "@/context/AuthContext";
+import { getUserErrorMessage } from "@/lib/apiClient";
+import { getHomeRouteByRole } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
 
@@ -23,6 +24,7 @@ type LoginInput = z.infer<typeof loginSchema>;
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { login } = useAuth();
   const [showPwd, setShowPwd] = useState(false);
 
   const {
@@ -43,19 +45,8 @@ export default function LoginForm() {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      const result = await apiFetch<{ access_token: string }>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
-
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-
-      await setAuthToken(result.data.access_token);
-      const role = decodeJwtPayload(result.data.access_token)?.role;
-      const roleHome = getHomeRouteByRole(role);
+      const profile = await login(data);
+      const roleHome = getHomeRouteByRole(profile?.role);
       toast.success("Connexion réussie");
       router.push(safeRedirect || roleHome);
       router.refresh();

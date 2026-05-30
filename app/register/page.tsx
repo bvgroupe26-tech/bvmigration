@@ -1,17 +1,12 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
 import { UserPlus } from "lucide-react";
-import { getSession } from "@/lib/auth";
 import RegisterForm from "@/components/auth/RegisterForm";
 import LoginCardEntrance from "@/app/login/LoginCardEntrance";
 
 export const dynamic = "force-dynamic";
 
-export default async function RegisterPage() {
-  const session = await getSession();
-  if (session) redirect("/dashboard");
-
+export default function RegisterPage() {
   return (
     <div className="relative min-h-screen bg-[#F4F7FB] text-slate-900">
       <div className="h-0.5 bv-gradient-bar" />

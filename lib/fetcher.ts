@@ -1,9 +1,15 @@
-import { apiFetch, apiGet, apiPost, apiPut, apiDelete } from "./api-client";
-import type { ApiResponse } from "./api-client";
+import {
+  apiFetch,
+  apiGet,
+  apiPost,
+  apiPut,
+  apiDelete,
+  type ApiResponse,
+} from "@/lib/apiClient";
 
 export type { ApiResponse };
 
-export { getUserErrorMessage } from "./api-errors";
+export { getUserErrorMessage } from "@/lib/api-errors";
 
 export async function fetcher<T>(path: string): Promise<T> {
   return apiGet<T>(path);
