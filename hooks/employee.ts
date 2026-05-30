@@ -8,14 +8,17 @@ import {
   normalizeAbsenceBalance,
   normalizeEmployeeAbsences,
   normalizeEmployeeDocuments,
-  normalizeEmployeeNotifications,
 } from "@/lib/employee-api-utils";
+import {
+  useNotificationsFeed,
+  markNotificationRead,
+  refreshNotificationsCache,
+} from "@/hooks/useNotifications";
 import type {
   AbsenceBalance,
   CreateAbsenceInput,
   EmployeeAbsence,
   EmployeeDocument,
-  EmployeeNotification,
   EmployeMe,
   UserMePayload,
 } from "@/lib/employee/types";
@@ -108,15 +111,18 @@ export function useMyDocuments() {
 }
 
 export function useMyNotifications() {
-  const { data, error, isLoading, mutate } = useSWR<EmployeeNotification[]>(
-    "/notifications/me",
-    async () => normalizeEmployeeNotifications(await fetcher<unknown>("/notifications/me")),
-    SHORT
-  );
-  const notifications = data ?? [];
-  const unreadCount = notifications.filter((n) => !(n.lu ?? n.lue)).length;
-  return { notifications, unreadCount, isLoading, error, mutate };
+  const feed = useNotificationsFeed();
+  return {
+    notifications: feed.notifications,
+    unreadCount: feed.unreadCount,
+    isLoading: feed.isLoading,
+    error: feed.error,
+    mutate: feed.refresh,
+  };
 }
+
+export { markNotificationRead, refreshNotificationsCache };
+export type { Notification as EmployeeNotification } from "@/lib/notifications";
 
 export async function updateEmployeMe(body: Partial<EmployeMe>) {
   const result = await apiPut<unknown>("/employes/me", body);
@@ -144,10 +150,6 @@ export function openPayslipPrint(id: number) {
 
 export async function downloadDocument(id: number, name?: string) {
   return apiDownload(`/documents/${id}/download`, name ?? `document-${id}`);
-}
-
-export async function markNotificationRead(id: number) {
-  return apiPut<EmployeeNotification>(`/notifications/${id}/read`, {});
 }
 
 export async function refreshAuthToken() {

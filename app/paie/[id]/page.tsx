@@ -15,6 +15,7 @@ import { Field, Input } from "@/components/ui/Field";
 import BulletinPaieSheet from "@/components/paie/BulletinPaieSheet";
 import { usePaieDetail } from "@/hooks/api";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
+import { refreshNotificationsCache } from "@/hooks/useNotifications";
 import { paieMontantsFormSchema, type PaieMontantsFormInput } from "@/lib/schemas";
 import { calcSalaireNet } from "@/lib/paie-calc";
 import type { Paie } from "@/lib/types";
@@ -79,6 +80,7 @@ export default function BulletinDetailPage({ params }: { params: Promise<{ id: s
       await apiClient.put(`/paie/${id}`, { statut });
       toast.success(`Bulletin ${statut === "paye" ? "marqué payé" : "annulé"}`);
       mutate();
+      void refreshNotificationsCache();
     } catch (err) {
       toast.error(getUserErrorMessage(err));
     }

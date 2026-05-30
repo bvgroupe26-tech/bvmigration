@@ -25,6 +25,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import AbsenceForm from "@/components/forms/AbsenceForm";
 import { useAbsences } from "@/hooks/api";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
+import { refreshNotificationsCache } from "@/hooks/useNotifications";
 import { absenceDureeJours, formatPeriodeAbsence } from "@/lib/absence-utils";
 import type { Absence, AbsenceType } from "@/lib/types";
 
@@ -71,6 +72,7 @@ export default function AbsencesPage() {
       await apiClient.put(`/absences/${a.id}`, { statut });
       toast.success(statut === "approuve" ? "Absence approuvée" : "Absence refusée");
       mutate();
+      void refreshNotificationsCache();
     } catch (err) {
       toast.error(getUserErrorMessage(err));
     }

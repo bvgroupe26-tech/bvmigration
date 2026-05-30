@@ -11,6 +11,7 @@ import {
   createAbsence,
   cancelAbsence,
 } from "@/hooks/employee";
+import { refreshNotificationsCache } from "@/hooks/useNotifications";
 import {
   ABSENCE_STATUT_LABELS,
   ABSENCE_TYPE_LABELS,
@@ -67,6 +68,7 @@ export default function EmployeeLeavesClient() {
         ...form,
       });
       await mutate();
+      void refreshNotificationsCache();
       setShowForm(false);
       setForm({ dateDebut: "", dateFin: "", typeAbsence: "conge_paye", justification: "" });
       toast.success("Demande envoyée");

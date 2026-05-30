@@ -34,6 +34,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import PaieGenerateResultModal from "@/components/paie/PaieGenerateResultModal";
 import { usePaie, usePaieStats, usePaieEvolution } from "@/hooks/api";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
+import { refreshNotificationsCache } from "@/hooks/useNotifications";
 import { formatProrata, normalizeGeneratePaieResult, type GeneratePaieResult } from "@/lib/paie-utils";
 import type { Paie } from "@/lib/types";
 
@@ -73,6 +74,7 @@ export default function PaiePage() {
       }
       mutate();
       mutateStats();
+      void refreshNotificationsCache();
     } catch (err) {
       toast.error(getUserErrorMessage(err));
     } finally {
@@ -87,6 +89,7 @@ export default function PaiePage() {
       toast.success(`Bulletin ${statut === "paye" ? "marqué payé" : "annulé"}`);
       mutate();
       mutateStats();
+      void refreshNotificationsCache();
     } catch (err) {
       toast.error(getUserErrorMessage(err));
     }

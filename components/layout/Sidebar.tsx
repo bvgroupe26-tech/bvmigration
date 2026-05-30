@@ -6,18 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
-  LayoutDashboard,
-  Users,
-  Clock,
-  CalendarOff,
-  Wallet,
-  Briefcase,
-  GraduationCap,
-  ChartLine,
   LogOut,
-  BarChart3,
-  Landmark,
 } from "lucide-react";
+import { ADMIN_NAV, isNavActive } from "@/lib/nav-config";
 import { cn, getInitials, getAvatarGradient } from "@/lib/utils";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import { clearAuthToken } from "@/lib/api-client";
@@ -25,22 +16,11 @@ import { clearAuthToken } from "@/lib/api-client";
 type NavItem = {
   href: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  icon: (typeof ADMIN_NAV)[number]["icon"];
   isSubItem?: boolean;
 };
 
-const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/statistiques", label: "Statistiques", icon: BarChart3 },
-  { href: "/employes", label: "Employés", icon: Users },
-  { href: "/presence", label: "Présence", icon: Clock },
-  { href: "/presence/absences", label: "Absences", icon: CalendarOff, isSubItem: true },
-  { href: "/paie", label: "Paie", icon: Wallet },
-  { href: "/budget", label: "Budget", icon: Landmark },
-  { href: "/recrutement", label: "Recrutement", icon: Briefcase },
-  { href: "/competences", label: "Compétences", icon: GraduationCap },
-  { href: "/competences/evaluations", label: "Évaluations", icon: ChartLine, isSubItem: true },
-];
+const navItems: NavItem[] = ADMIN_NAV;
 
 type SidebarProps = {
   user?: {
@@ -49,9 +29,10 @@ type SidebarProps = {
     prenom: string;
     role: string;
   };
+  className?: string;
 };
 
-export default function Sidebar({ user }: SidebarProps) {
+export default function Sidebar({ user, className }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -73,7 +54,12 @@ export default function Sidebar({ user }: SidebarProps) {
     : "from-[#2F5F9D] to-[#1F3F73]";
 
   return (
-    <aside className="sticky top-0 z-30 h-screen w-[260px] shrink-0 self-start overflow-hidden bg-[#1F3F73] text-white shadow-[4px_0_24px_rgba(15,23,42,0.12)]">
+    <aside
+      className={cn(
+        "sticky top-0 z-30 h-[100dvh] w-[260px] shrink-0 self-start overflow-hidden bg-[#1F3F73] text-white shadow-[4px_0_24px_rgba(15,23,42,0.12)]",
+        className
+      )}
+    >
       <div className="flex h-full min-h-0 flex-col">
         <div className="px-6 pt-7 pb-5">
           <Link href="/dashboard" className="flex items-center gap-3 group">
@@ -108,9 +94,7 @@ export default function Sidebar({ user }: SidebarProps) {
           <ul className="flex flex-col gap-0.5">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive =
-                pathname === item.href ||
-                (item.href !== "/dashboard" && pathname?.startsWith(item.href));
+              const isActive = isNavActive(pathname ?? "", item.href);
 
               return (
                 <li key={item.href}>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Syne, JetBrains_Mono, DM_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { TitlebarLayoutShell } from "@/components/Titlebar";
+import PwaInstallPrompt from "@/components/pwa/PwaInstallPrompt";
 import "./globals.css";
 
 const syne = Syne({
@@ -30,10 +31,18 @@ export const metadata: Metadata = {
   description:
     "Plateforme moderne de gestion des ressources humaines : employés, paie, présences, recrutement, compétences.",
   manifest: "/manifest.webmanifest",
+  applicationName: "BV Groupe RH",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "BV Group RH",
+    title: "BV Groupe RH",
   },
 };
 
@@ -62,6 +71,7 @@ export default function RootLayout({
       >
         <TitlebarLayoutShell>
           {children}
+          <PwaInstallPrompt />
           <Toaster
             theme="light"
             position="top-right"

@@ -35,6 +35,11 @@
   --glow-green: rgba(4, 120, 87, 0.1);
   --glow-amber: rgba(180, 83, 9, 0.1);
   --glow-red: rgba(185, 28, 28, 0.1);
+
+  /* Shell PWA (NetAcad-style) */
+  --shell-bottom-nav-height: 4rem;
+  --shell-header-height: 3.5rem;
+  --shell-content-max: 80rem;
 }
 
 @theme inline {
@@ -389,6 +394,38 @@ select:focus {
 }
 .bv-progress-bar {
   background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+}
+
+/* Shell responsive PWA */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.shell-main {
+  padding: 1rem;
+  padding-bottom: calc(var(--shell-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 1rem);
+}
+
+@media (min-width: 640px) {
+  .shell-main {
+    padding: 1.25rem 1.5rem;
+    padding-bottom: calc(var(--shell-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 1.25rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  .shell-main {
+    padding: 1.5rem 2rem;
+    padding-bottom: 1.5rem;
+  }
+}
+
+.shell-sidebar {
+  min-height: 100dvh;
 }
 
 /* Impression bulletins de paie (A4, institutionnel) */

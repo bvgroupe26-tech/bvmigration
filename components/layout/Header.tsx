@@ -2,12 +2,14 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Bell, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import NotificationsBell from "@/components/notifications/NotificationsBell";
 import { useMemo } from "react";
 
 const ROUTE_LABELS: Record<string, string> = {
   "": "Dashboard",
   dashboard: "Dashboard",
+  notifications: "Notifications",
   statistiques: "Statistiques & performance",
   employes: "Employés",
   nouveau: "Nouveau",
@@ -45,11 +47,11 @@ export default function Header() {
   const title = segments.length === 0 ? "Dashboard RH" : labelizeSegment(segments[segments.length - 1]);
 
   return (
-    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white pt-safe">
       <div className="h-0.5 bg-gradient-to-r from-[#1F3F73] via-[#2F5F9D] to-[#F2C94C]" />
-      <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
-          <nav className="flex min-h-4 items-center gap-1.5 text-xs leading-tight text-slate-500">
+          <nav className="hidden min-h-4 items-center gap-1.5 text-xs leading-tight text-slate-500 sm:flex">
             <Link href="/dashboard" className="transition hover:text-[#2F5F9D]">
               Accueil
             </Link>
@@ -70,18 +72,12 @@ export default function Header() {
               );
             })}
           </nav>
-          <h1 className="truncate font-display text-[22px] font-bold leading-tight tracking-tight text-[#1F3F73] sm:text-[24px]">
+          <h1 className="truncate font-display text-lg font-bold leading-tight tracking-tight text-[#1F3F73] sm:text-[22px] lg:text-[24px]">
             {title}
           </h1>
         </div>
 
-        <button
-          type="button"
-          className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#2F5F9D]/30 hover:bg-[#E8F0FA] hover:text-[#1F3F73]"
-          aria-label="Notifications"
-        >
-          <Bell className="h-4 w-4" />
-        </button>
+        <NotificationsBell context="admin" />
       </div>
     </header>
   );

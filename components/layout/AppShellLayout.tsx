@@ -1,7 +1,5 @@
 import { redirect } from "next/navigation";
-import Sidebar from "@/components/layout/Sidebar";
-import Header from "@/components/layout/Header";
-import PageTransition from "@/components/layout/PageTransition";
+import AdminAppShell from "@/components/layout/AdminAppShell";
 import EmployeePanelGate from "@/components/layout/EmployeePanelGate";
 import { getSession } from "@/lib/auth";
 
@@ -21,15 +19,7 @@ export default async function AppShellLayout({
 
   return (
     <EmployeePanelGate>
-      <div className="relative z-10 flex min-h-screen bg-[#F4F7FB]">
-        <Sidebar user={user} />
-        <div className="flex min-w-0 flex-1 flex-col bg-[#F8FAFC]">
-          <Header />
-          <main className="flex-1 px-6 py-6 sm:px-8">
-            <PageTransition>{children}</PageTransition>
-          </main>
-        </div>
-      </div>
+      <AdminAppShell user={user}>{children}</AdminAppShell>
     </EmployeePanelGate>
   );
 }
