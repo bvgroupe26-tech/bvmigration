@@ -45,9 +45,9 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
   }
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#F8FAFC]">
-      {/* Sidebar desktop — style NetAcad */}
-      <aside className="shell-sidebar hidden w-[260px] shrink-0 flex-col overflow-hidden bg-[#1F3F73] text-white shadow-[4px_0_24px_rgba(15,23,42,0.12)] lg:flex">
+    <div className="flex min-h-[100dvh] bg-[#F8FAFC] lg:h-[100dvh] lg:overflow-hidden">
+      {/* Sidebar desktop — fixe, seul le contenu défile */}
+      <aside className="shell-sidebar hidden w-[260px] shrink-0 flex-col overflow-hidden bg-[#1F3F73] text-white shadow-[4px_0_24px_rgba(15,23,42,0.12)] lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:h-[100dvh]">
         <div className="border-b border-white/10 px-6 py-6">
           <Link href="/employee/dashboard" className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-white/10 ring-1 ring-white/15">
@@ -131,9 +131,9 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
         </div>
       </aside>
 
-      {/* Colonne principale */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="no-print sticky top-0 z-40 border-b border-slate-200/90 bg-white/95 pt-safe backdrop-blur-md">
+      {/* Colonne principale — scroll indépendant sur desktop */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:ml-[260px] lg:h-[100dvh] lg:overflow-hidden">
+        <header className="no-print shrink-0 border-b border-slate-200/90 bg-white/95 pt-safe backdrop-blur-md lg:static">
           <div className="shell-content mx-auto flex h-14 items-center justify-between gap-3 px-4 sm:h-16">
             <div className="flex min-w-0 items-center gap-2.5 lg:gap-3">
               <Image
@@ -180,7 +180,7 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
           </div>
         </header>
 
-        <main className="shell-main flex-1 overflow-x-hidden">
+        <main className="shell-main min-h-0 flex-1 overflow-x-hidden lg:overflow-y-auto lg:overscroll-contain">
           <div className="shell-content mx-auto w-full max-w-lg lg:max-w-4xl xl:max-w-5xl">{children}</div>
         </main>
       </div>

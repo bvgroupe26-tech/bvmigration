@@ -428,6 +428,14 @@ select:focus {
   min-height: 100dvh;
 }
 
+@media (min-width: 1024px) {
+  .shell-main-scroll {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 /* Impression bulletins de paie (A4, institutionnel) */
 @media print {
   @page {

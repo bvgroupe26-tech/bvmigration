@@ -28,12 +28,12 @@ export default function AdminAppShell({ user, children }: AdminAppShellProps) {
   );
 
   return (
-    <div className="relative z-10 flex min-h-[100dvh] bg-[#F4F7FB]">
+    <div className="relative z-10 flex min-h-[100dvh] bg-[#F4F7FB] lg:h-[100dvh] lg:overflow-hidden">
       <Sidebar user={user} className="hidden lg:flex" />
 
-      <div className="flex min-w-0 flex-1 flex-col bg-[#F8FAFC]">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#F8FAFC] lg:ml-[260px] lg:h-[100dvh] lg:overflow-hidden">
         <Header />
-        <main className="shell-main flex-1 overflow-x-hidden">
+        <main className="shell-main min-h-0 flex-1 overflow-x-hidden lg:overflow-y-auto lg:overscroll-contain">
           <div className="shell-content mx-auto w-full max-w-7xl">
             <PageTransition>{children}</PageTransition>
           </div>

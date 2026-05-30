@@ -56,7 +56,8 @@ export default function Sidebar({ user, className }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "sticky top-0 z-30 h-[100dvh] w-[260px] shrink-0 self-start overflow-hidden bg-[#1F3F73] text-white shadow-[4px_0_24px_rgba(15,23,42,0.12)]",
+        "z-30 hidden w-[260px] shrink-0 overflow-hidden bg-[#1F3F73] text-white shadow-[4px_0_24px_rgba(15,23,42,0.12)]",
+        "lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:h-[100dvh] lg:flex-col",
         className
       )}
     >

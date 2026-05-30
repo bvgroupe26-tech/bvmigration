@@ -47,7 +47,7 @@ export default function Header() {
   const title = segments.length === 0 ? "Dashboard RH" : labelizeSegment(segments[segments.length - 1]);
 
   return (
-    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white pt-safe">
+    <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-white pt-safe lg:static">
       <div className="h-0.5 bg-gradient-to-r from-[#1F3F73] via-[#2F5F9D] to-[#F2C94C]" />
       <div className="flex items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:px-8">
         <div className="min-w-0 flex-1">
