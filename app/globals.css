@@ -1,0 +1,423 @@
+@import "tailwindcss";
+
+:root {
+  /* Fond global (cadre institutionnel) */
+  --canvas: #f1f5f9;
+
+  /* Surfaces */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-elevated: #f1f5f9;
+
+  /* Charte BV (bleu + or) */
+  --accent-primary: #2f5f9d;
+  --accent-secondary: #1f3f73;
+  --accent-gold: #f2c94c;
+  --accent-success: #047857;
+  --accent-warning: #b45309;
+  --accent-danger: #b91c1c;
+  --accent-purple: #6d28d9;
+
+  /* Texte */
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-tertiary: #64748b;
+
+  /* Bordures */
+  --border: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.14);
+
+  /* Glow (léger, sobre) */
+  --glow-blue: rgba(47, 95, 157, 0.16);
+  --glow-cyan: rgba(31, 63, 115, 0.12);
+  --glow-gold: rgba(242, 201, 76, 0.2);
+  --glow-green: rgba(4, 120, 87, 0.1);
+  --glow-amber: rgba(180, 83, 9, 0.1);
+  --glow-red: rgba(185, 28, 28, 0.1);
+}
+
+@theme inline {
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-card: var(--bg-card);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-secondary: var(--accent-secondary);
+  --color-accent-gold: var(--accent-gold);
+  --color-accent-success: var(--accent-success);
+  --color-accent-warning: var(--accent-warning);
+  --color-accent-danger: var(--accent-danger);
+  --color-accent-purple: var(--accent-purple);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border-soft: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --font-display: var(--font-syne);
+  --font-sans: var(--font-dm-sans);
+  --font-mono: var(--font-jetbrains-mono);
+
+  --radius-card: 16px;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  background: var(--canvas);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-dm-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--canvas);
+  background-image: none;
+}
+
+/* Texture très discrète */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Fils décoratifs optionnels (très légers sur fond clair) */
+.gradient-mesh {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.gradient-mesh::before,
+.gradient-mesh::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(120px);
+  opacity: 0.12;
+  will-change: transform;
+}
+
+.gradient-mesh::before {
+  width: 480px;
+  height: 480px;
+  top: -100px;
+  left: -80px;
+  background: radial-gradient(circle, rgba(47, 95, 157, 0.08) 0%, transparent 72%);
+  animation: blobFloat1 24s ease-in-out infinite;
+}
+
+.gradient-mesh::after {
+  width: 520px;
+  height: 520px;
+  bottom: -140px;
+  right: -100px;
+  background: radial-gradient(circle, rgba(31, 63, 115, 0.06) 0%, transparent 72%);
+  animation: blobFloat2 30s ease-in-out infinite;
+}
+
+@keyframes blobFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(40px, 24px) scale(1.05); }
+}
+
+@keyframes blobFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-36px, -20px) scale(1.04); }
+}
+
+/* Cartes type « surface » institutionnelle */
+.glass-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 16px rgba(15, 23, 42, 0.06);
+}
+
+.glass-card-hover {
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.glass-card-hover:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  box-shadow:
+    0 4px 12px rgba(15, 23, 42, 0.08),
+    0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+/* Bouton principal institutionnel */
+.glow-button {
+  background: linear-gradient(180deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 4px 12px var(--glow-blue);
+  transition: box-shadow 0.2s ease, transform 0.15s ease, filter 0.2s ease;
+}
+
+.glow-button:hover {
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08), 0 8px 20px var(--glow-blue);
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+}
+
+.glow-button:active {
+  transform: translateY(0);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.15);
+  border-radius: 8px;
+  border: 2px solid var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.28);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes landing-blob-1 {
+  0% { transform: translate(0, -30px) scale(1); }
+  100% { transform: translate(30px, 30px) scale(1.05); }
+}
+@keyframes landing-blob-2 {
+  0% { transform: translate(0, 30px) scale(1); }
+  100% { transform: translate(-20px, -30px) scale(0.95); }
+}
+@keyframes landing-blob-3 {
+  0% { transform: translate(-50%, calc(-50% - 18px)) scale(1); }
+  100% { transform: translate(-50%, calc(-50% + 18px)) scale(1.04); }
+}
+@keyframes landing-float-y {
+  0%, 100% { transform: translateY(-10px); }
+  50% { transform: translateY(10px); }
+}
+@keyframes landing-particle {
+  0%, 100% { transform: translate(0, 0); opacity: 0.5; }
+  50% { transform: translate(8px, -12px); opacity: 1; }
+}
+@keyframes landing-badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(242, 201, 76, 0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(242, 201, 76, 0); }
+}
+@keyframes landing-fade-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.landing-blob-1 { animation: landing-blob-1 8s ease-in-out infinite alternate; }
+.landing-blob-2 { animation: landing-blob-2 8s ease-in-out infinite alternate 1.5s; }
+.landing-blob-3 { animation: landing-blob-3 10s ease-in-out infinite alternate 0.75s; }
+.landing-float-y { animation: landing-float-y 4s ease-in-out infinite; }
+.landing-badge-pulse { animation: landing-badge-pulse 2.5s ease-in-out infinite; }
+.landing-particle { animation: landing-particle 3s ease-in-out infinite; }
+.landing-fade-down { animation: landing-fade-down 0.6s ease-out both; }
+
+.landing-dot-grid {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: 0 0;
+  opacity: 0.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-blob-1,
+  .landing-blob-2,
+  .landing-blob-3,
+  .landing-float-y,
+  .landing-badge-pulse,
+  .landing-particle,
+  .landing-fade-down {
+    animation: none !important;
+  }
+}
+
+@keyframes statusPulse {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  50% { box-shadow: 0 0 0 6px transparent; opacity: 0.65; }
+}
+
+.status-dot-pulse {
+  animation: statusPulse 2.4s ease-in-out infinite;
+}
+
+::selection {
+  background: rgba(47, 95, 157, 0.18);
+  color: var(--text-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+input,
+textarea,
+select {
+  background-color: #ffffff;
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: inherit;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(47, 95, 157, 0.15);
+}
+
+.table-dark {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table-dark thead th {
+  background: #f8fafc;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 14px 18px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.table-dark tbody td {
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.table-dark tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.table-dark tbody tr:hover {
+  background-color: rgba(47, 95, 157, 0.04);
+}
+
+.table-dark tbody tr:nth-child(even) {
+  background-color: rgba(248, 250, 252, 0.9);
+}
+
+/* BV — utilitaires charte */
+.text-bv {
+  color: var(--accent-primary);
+}
+.text-bv-dark {
+  color: var(--accent-secondary);
+}
+.bg-bv-soft {
+  background-color: #e8f0fa;
+}
+.border-bv-soft {
+  border-color: rgba(47, 95, 157, 0.2);
+}
+.hover\:text-bv-dark:hover {
+  color: var(--accent-secondary);
+}
+.bv-gradient-primary {
+  background: linear-gradient(180deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+}
+.bv-gradient-bar {
+  background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary), var(--accent-gold));
+}
+.bv-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background-color: #e8f0fa;
+  color: var(--accent-primary);
+}
+.bv-control-focus:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(47, 95, 157, 0.15);
+}
+.bv-tab-active {
+  background-color: var(--accent-primary);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+.bv-progress-bar {
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+}
+
+/* Impression bulletins de paie (A4, institutionnel) */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #0f172a !important;
+  }
+
+  body::before {
+    display: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .bulletin-print-root {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+
+  .bulletin-pro-table {
+    font-size: 11pt;
+  }
+}
