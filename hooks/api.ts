@@ -23,6 +23,7 @@ import {
   normalizeAbsenceList,
   unwrapAbsenceListPayload,
 } from "@/lib/absence-utils";
+import { normalizeBudgetSynthese } from "@/lib/budget-utils";
 import { normalizeStatistiquesSynthese } from "@/lib/statistiques-utils";
 import type {
   Employe,
@@ -359,7 +360,11 @@ export function useStatistiquesSynthese() {
 
 export function useBudgetSynthese(annee?: number) {
   const url = `/budget/synthese${qs({ annee })}`;
-  const { data, error, isLoading, mutate } = useSWR<BudgetSynthese>(url, fetcher, SHORT);
+  const { data, error, isLoading, mutate } = useSWR<BudgetSynthese>(
+    url,
+    async () => normalizeBudgetSynthese(await fetcher<unknown>(url), annee),
+    SHORT
+  );
   return { synthese: data, isLoading, error, mutate };
 }
 

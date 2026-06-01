@@ -25,10 +25,7 @@ export default function BudgetOverviewPage() {
   const [annee, setAnnee] = useState(year);
   const { synthese, isLoading, error, mutate } = useBudgetSynthese(annee);
 
-  const taux = useMemo(() => {
-    if (!synthese) return null;
-    return synthese.totaux.taux_consommation_pct;
-  }, [synthese]);
+  const taux = useMemo(() => synthese?.totaux?.taux_consommation_pct ?? null, [synthese]);
 
   if (isLoading) {
     return (
@@ -126,7 +123,7 @@ export default function BudgetOverviewPage() {
           title="Dépenses mensuelles"
           subtitle="Montants saisis (tous statuts sauf refusé) sur 12 mois glissants"
         />
-        <BudgetMonthlyChart data={synthese.depenses_par_mois} />
+        <BudgetMonthlyChart data={synthese.depenses_par_mois ?? []} />
       </GlassCard>
 
       <GlassCard className="p-5">
