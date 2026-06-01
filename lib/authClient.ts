@@ -3,7 +3,18 @@
 import { resolveApiBaseUrl } from "@/lib/resolve-api-url";
 import type { UserMePayload } from "@/lib/employee/types";
 
+/** Route unique de refresh — proxy Next → NestJS */
+export const AUTH_REFRESH_URL = "/api/nest/auth/refresh";
+
 let accessToken: string | null = null;
+let isRefreshing = false;
+
+type RefreshWaiter = {
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+};
+
+let refreshWaiters: RefreshWaiter[] = [];
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
@@ -11,6 +22,10 @@ export function setAccessToken(token: string | null): void {
 
 export function getAccessToken(): string | null {
   return accessToken;
+}
+
+export function getIsRefreshing(): boolean {
+  return isRefreshing;
 }
 
 type AuthTokenPayload = {
@@ -37,41 +52,65 @@ export function extractAccessToken(payload: AuthTokenPayload | string | null | u
   return payload.access_token || payload.accessToken || payload.token || "";
 }
 
-async function postAuth(path: string): Promise<AuthTokenPayload> {
-  const res = await fetch(resolveApiUrl(path), {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
-  });
-
-  const json = await res.json().catch(() => null);
-
-  if (!res.ok) {
-    const message =
-      (json && typeof json === "object" && "error" in json && String((json as { error: unknown }).error)) ||
-      "Session expirée. Veuillez vous reconnecter.";
-    throw new Error(message);
-  }
-
-  return unwrapPayload<AuthTokenPayload>(json);
+function notifyRefreshSuccess(token: string): void {
+  refreshWaiters.forEach(({ resolve }) => resolve(token));
+  refreshWaiters = [];
 }
 
+function notifyRefreshFailure(error: unknown): void {
+  refreshWaiters.forEach(({ reject }) => reject(error));
+  refreshWaiters = [];
+}
+
+/**
+ * POST /api/nest/auth/refresh — cookie HttpOnly refresh uniquement (pas de body).
+ */
 export async function refreshAccessToken(): Promise<string> {
-  let payload: AuthTokenPayload;
+  if (isRefreshing) {
+    return new Promise<string>((resolve, reject) => {
+      refreshWaiters.push({ resolve, reject });
+    });
+  }
+
+  isRefreshing = true;
 
   try {
-    payload = await postAuth("/auth/refresh");
-  } catch {
-    payload = await postAuth("/auth/refresh-token");
-  }
+    const res = await fetch(AUTH_REFRESH_URL, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
-  const token = extractAccessToken(payload);
-  if (!token) {
-    throw new Error("Jeton d'accès introuvable.");
+    const json = await res.json().catch(() => null);
+
+    if (res.status === 401) {
+      setAccessToken(null);
+      throw new Error("Session expirée. Veuillez vous reconnecter.");
+    }
+
+    if (!res.ok) {
+      const message =
+        (json && typeof json === "object" && "error" in json && String((json as { error: unknown }).error)) ||
+        "Impossible de renouveler la session.";
+      throw new Error(message);
+    }
+
+    const payload = unwrapPayload<AuthTokenPayload>(json);
+    const token = extractAccessToken(payload);
+    if (!token) {
+      throw new Error("Jeton d'accès introuvable.");
+    }
+
+    setAccessToken(token);
+    notifyRefreshSuccess(token);
+    return token;
+  } catch (error) {
+    notifyRefreshFailure(error);
+    throw error;
+  } finally {
+    isRefreshing = false;
   }
-  setAccessToken(token);
-  return token;
 }
 
 export async function logout(): Promise<void> {

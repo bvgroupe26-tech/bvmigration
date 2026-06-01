@@ -11,6 +11,7 @@ import {
 } from "@/lib/api-errors";
 import {
   getAccessToken,
+  getIsRefreshing,
   logout,
   refreshAccessToken,
 } from "@/lib/authClient";
@@ -21,7 +22,7 @@ function getBaseUrl(): string {
   return resolveApiBaseUrl();
 }
 
-let isRefreshing = false;
+let isInterceptorRefreshing = false;
 let refreshWaiters: Array<{ resolve: () => void; reject: (error: unknown) => void }> = [];
 
 function subscribeRefresh(): Promise<void> {
@@ -43,26 +44,27 @@ function notifyRefreshFailure(error: unknown): void {
 async function ensureFreshAccessToken(path: string): Promise<boolean> {
   if (isAuthApiPath(path)) return false;
 
-  if (isRefreshing) {
+  // Refresh déjà en cours (authClient ou intercepteur) — attendre sans relancer
+  if (getIsRefreshing() || isInterceptorRefreshing) {
     try {
       await subscribeRefresh();
-      return true;
+      return Boolean(getAccessToken());
     } catch {
       return false;
     }
   }
 
-  isRefreshing = true;
+  isInterceptorRefreshing = true;
   try {
     await refreshAccessToken();
     notifyRefreshSuccess();
     return true;
-  } catch (error) {
-    notifyRefreshFailure(error);
+  } catch {
+    notifyRefreshFailure(new Error("refresh_failed"));
     await logout();
     return false;
   } finally {
-    isRefreshing = false;
+    isInterceptorRefreshing = false;
   }
 }
 

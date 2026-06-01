@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { UserMePayload } from "@/lib/employee/types";
 import { apiGet } from "@/lib/apiClient";
 import {
+  getAccessToken,
   loginRequest,
   logout as authLogout,
   refreshAccessToken,
@@ -45,27 +46,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const bootstrap = async () => {
+    const init = async () => {
       try {
-        await refreshSession();
+        await refreshAccessToken();
+        const profile = await fetchCurrentUser();
+        setUser(profile);
+        setIsAuthenticated(true);
       } catch {
-        if (!cancelled) {
+        // Pas de session (visiteur) ou refresh invalide — normal
+        if (!getAccessToken()) {
           setUser(null);
           setIsAuthenticated(false);
         }
       } finally {
-        if (!cancelled) setIsLoading(false);
+        setIsLoading(false);
       }
     };
 
-    void bootstrap();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshSession]);
+    void init();
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;
@@ -88,15 +87,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (credentials: LoginCredentials) => {
     const result = await loginRequest(credentials);
+
     if (result.user) {
       setUser(result.user);
       setIsAuthenticated(true);
+      setIsLoading(false);
       return result.user;
     }
 
     const profile = await fetchCurrentUser();
     setUser(profile);
     setIsAuthenticated(true);
+    setIsLoading(false);
     return profile;
   }, []);
 
@@ -118,15 +120,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user, isAuthenticated, isLoading, login, logout, refreshSession]
   );
 
-  const isPublic = PUBLIC_PATHS.has(pathname);
-  const showBlockingLoader = !isPublic && isLoading;
-  const showBlockedUnauth = !isPublic && !isLoading && !isAuthenticated;
+  if (isLoading) {
+    return (
+      <AuthContext.Provider value={value}>
+        <AuthLoading />
+      </AuthContext.Provider>
+    );
+  }
 
-  return (
-    <AuthContext.Provider value={value}>
-      {showBlockingLoader || showBlockedUnauth ? <AuthLoading /> : children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

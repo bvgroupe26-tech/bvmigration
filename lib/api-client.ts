@@ -16,6 +16,7 @@ export {
   refreshAccessToken,
   logout,
   loginRequest,
+  AUTH_REFRESH_URL,
 } from "@/lib/authClient";
 
 /** @deprecated Utiliser setAccessToken() — le token est stocké en mémoire uniquement. */
