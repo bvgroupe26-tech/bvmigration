@@ -36,66 +36,20 @@ export default function AuthGuard({ children, allowedRoles, redirectTo }: AuthGu
 
     const target = redirectTo || getHomeRouteByRole(user.role);
     if (pathname === target || pathname.startsWith(`${target}/`)) {
-      // #region agent log
-      fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-        body: JSON.stringify({
-          sessionId: "cd157f",
-          runId: "admin-auth",
-          hypothesisId: "A1",
-          location: "AuthGuard.tsx:redirectLoop",
-          message: "role blocked on target route",
-          data: {
-            pathname,
-            target,
-            rawRole: user.role,
-            normalizedRole: normalizeAppRole(user.role),
-            allowedRoles,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       return;
     }
 
     if (redirectedRef.current) return;
     redirectedRef.current = true;
-    // #region agent log
-    fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-      body: JSON.stringify({
-        sessionId: "cd157f",
-        runId: "admin-auth",
-        hypothesisId: "A1",
-        location: "AuthGuard.tsx:redirect",
-        message: "redirecting wrong role",
-        data: {
-          pathname,
-          target,
-          rawRole: user.role,
-          normalizedRole: normalizeAppRole(user.role),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     router.replace(target);
-  }, [
-    allowedRoles,
-    hasAccess,
-    isAuthenticated,
-    isLoading,
-    pathname,
-    redirectTo,
-    router,
-    user,
-  ]);
+  }, [allowedRoles, hasAccess, isAuthenticated, isLoading, pathname, redirectTo, router, user]);
 
-  if (isLoading || !isAuthenticated || !user) {
+  if (isLoading) {
     return <AuthLoading />;
+  }
+
+  if (!isAuthenticated || !user) {
+    return null;
   }
 
   if (!hasAccess) {

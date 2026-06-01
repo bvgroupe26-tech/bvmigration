@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -21,7 +21,6 @@ const loginSchema = z.object({
 type LoginInput = z.infer<typeof loginSchema>;
 
 export default function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
   const [showPwd, setShowPwd] = useState(false);
@@ -47,9 +46,10 @@ export default function LoginForm() {
     try {
       const profile = await login(data);
       const roleHome = getHomeRouteByRole(profile?.role);
+      const target = safeRedirect || roleHome;
       toast.success("Connexion réussie");
-      router.push(safeRedirect || roleHome);
-      router.refresh();
+      // Navigation complète : évite les blocages de session sur mobile (PWA / Safari).
+      window.location.assign(target);
     } catch (err) {
       toast.error(getUserErrorMessage(err, "Connexion impossible. Vérifiez votre email et votre mot de passe."));
     }

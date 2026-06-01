@@ -17,8 +17,36 @@ type RefreshWaiter = {
 
 let refreshWaiters: RefreshWaiter[] = [];
 
+const AUTH_FETCH_TIMEOUT_MS = 20_000;
+
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+}
+
+/** Réinitialise l’état client après déconnexion (évite les blocages sur mobile). */
+export function resetAuthSessionState(): void {
+  accessToken = null;
+  if (isRefreshing) {
+    const err = new Error("Session fermée");
+    notifyRefreshFailure(err);
+  }
+  isRefreshing = false;
+  refreshWaiters = [];
+}
+
+async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), AUTH_FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      credentials: "include",
+      cache: "no-store",
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export function getAccessToken(): string | null {
@@ -72,11 +100,9 @@ export async function refreshAccessToken(): Promise<string> {
   isRefreshing = true;
 
   try {
-    const res = await fetch(AUTH_REFRESH_URL, {
+    const res = await authFetch(AUTH_REFRESH_URL, {
       method: "POST",
-      credentials: "include",
       headers: { "Content-Type": "application/json" },
-      cache: "no-store",
     });
 
     const json = await res.json().catch(() => null);
@@ -103,6 +129,12 @@ export async function refreshAccessToken(): Promise<string> {
     notifyRefreshSuccess(token);
     return token;
   } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      const timeoutErr = new Error("Délai dépassé. Vérifiez votre connexion et réessayez.");
+      setAccessToken(null);
+      notifyRefreshFailure(timeoutErr);
+      throw timeoutErr;
+    }
     notifyRefreshFailure(error);
     throw error;
   } finally {
@@ -111,19 +143,18 @@ export async function refreshAccessToken(): Promise<string> {
 }
 
 export async function logout(): Promise<void> {
+  resetAuthSessionState();
   try {
-    await fetch(AUTH_LOGOUT_URL, {
+    await authFetch(AUTH_LOGOUT_URL, {
       method: "POST",
-      credentials: "include",
       headers: { "Content-Type": "application/json" },
-      cache: "no-store",
     });
   } catch {
     /* ignore network errors during logout */
   } finally {
-    setAccessToken(null);
-    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
-      window.location.href = "/login";
+    resetAuthSessionState();
+    if (typeof window !== "undefined") {
+      window.location.replace("/login");
     }
   }
 }
@@ -137,12 +168,10 @@ export async function loginRequest(credentials: LoginCredentials): Promise<{
   accessToken: string;
   user?: UserMePayload;
 }> {
-  const res = await fetch(AUTH_LOGIN_URL, {
+  const res = await authFetch(AUTH_LOGIN_URL, {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(credentials),
-    cache: "no-store",
   });
 
   const json = await res.json().catch(() => null);

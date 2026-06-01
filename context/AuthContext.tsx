@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { UserMePayload } from "@/lib/employee/types";
 import { apiGet } from "@/lib/apiClient";
@@ -10,12 +10,15 @@ import {
   loginRequest,
   logout as authLogout,
   refreshAccessToken,
+  resetAuthSessionState,
   type LoginCredentials,
 } from "@/lib/authClient";
 import { decodeJwtPayload, getHomeRouteByRole, normalizeAppRole } from "@/lib/session";
 import AuthLoading from "@/components/auth/AuthLoading";
 
 const PUBLIC_PATHS = new Set(["/", "/login"]);
+
+const SESSION_BOOT_TIMEOUT_MS = 22_000;
 
 type AuthContextValue = {
   user: UserMePayload | null;
@@ -97,6 +100,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname() || "/";
   const router = useRouter();
+  const skipNextBootstrapRef = useRef(false);
+  const bootstrapGenRef = useRef(0);
+  const userRef = useRef(user);
+  const isAuthenticatedRef = useRef(isAuthenticated);
+  userRef.current = user;
+  isAuthenticatedRef.current = isAuthenticated;
 
   const refreshSession = useCallback(async () => {
     const token = await refreshAccessToken();
@@ -106,28 +115,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const generation = ++bootstrapGenRef.current;
+    let cancelled = false;
+
+    const finish = () => {
+      if (!cancelled && generation === bootstrapGenRef.current) {
+        setIsLoading(false);
+      }
+    };
+
     const init = async () => {
       const isPublic = PUBLIC_PATHS.has(pathname);
 
       if (isPublic) {
-        setIsLoading(false);
+        finish();
+        return;
+      }
+
+      if (skipNextBootstrapRef.current) {
+        skipNextBootstrapRef.current = false;
+        finish();
+        return;
+      }
+
+      const existingToken = getAccessToken();
+      if (isAuthenticatedRef.current && userRef.current && existingToken) {
+        finish();
         return;
       }
 
       try {
         const token = await refreshAccessToken();
+        if (cancelled || generation !== bootstrapGenRef.current) return;
+
         const profile = await fetchCurrentUser(token);
-        setUser(profile);
+        if (cancelled || generation !== bootstrapGenRef.current) return;
+
+        setUser(enrichUserProfile(profile, token));
         setIsAuthenticated(true);
       } catch {
+        if (cancelled || generation !== bootstrapGenRef.current) return;
         setUser(null);
         setIsAuthenticated(false);
+        resetAuthSessionState();
       } finally {
-        setIsLoading(false);
+        finish();
       }
     };
 
-    void init();
+    const watchdog = window.setTimeout(() => {
+      if (cancelled || generation !== bootstrapGenRef.current) return;
+      resetAuthSessionState();
+      setUser(null);
+      setIsAuthenticated(false);
+      finish();
+    }, SESSION_BOOT_TIMEOUT_MS);
+
+    void init().finally(() => {
+      window.clearTimeout(watchdog);
+    });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(watchdog);
+    };
   }, [pathname]);
 
   useEffect(() => {
@@ -148,17 +199,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated, isLoading, pathname, router, user]);
 
   const login = useCallback(async (credentials: LoginCredentials) => {
+    resetAuthSessionState();
     const result = await loginRequest(credentials);
 
+    let profile: UserMePayload;
     if (result.user) {
-      const user = enrichUserProfile(result.user, result.accessToken);
-      setUser(user);
-      setIsAuthenticated(true);
-      setIsLoading(false);
-      return user;
+      profile = enrichUserProfile(result.user, result.accessToken);
+    } else {
+      profile = await fetchCurrentUser(result.accessToken);
     }
 
-    const profile = await fetchCurrentUser(result.accessToken);
+    skipNextBootstrapRef.current = true;
     setUser(profile);
     setIsAuthenticated(true);
     setIsLoading(false);
@@ -168,6 +219,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     setUser(null);
     setIsAuthenticated(false);
+    setIsLoading(false);
+    skipNextBootstrapRef.current = false;
     await authLogout();
   }, []);
 
@@ -183,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user, isAuthenticated, isLoading, login, logout, refreshSession]
   );
 
-  if (isLoading && pathname !== "/") {
+  if (isLoading && !PUBLIC_PATHS.has(pathname)) {
     return (
       <AuthContext.Provider value={value}>
         <AuthLoading />
