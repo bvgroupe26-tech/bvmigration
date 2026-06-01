@@ -1,10 +1,10 @@
 "use client";
 
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Cell, Pie, PieChart, Tooltip } from "recharts";
 import { motion } from "framer-motion";
 import { PieChart as PieIcon } from "lucide-react";
-import { useEffect, useState } from "react";
 import GlassCard from "@/components/ui/GlassCard";
+import ChartContainer from "@/components/ui/ChartContainer";
 import Skeleton from "@/components/ui/Skeleton";
 import { useDashboardDepartements } from "@/hooks/api";
 
@@ -36,10 +36,6 @@ function CustomTooltip({
 
 export default function DepartementsDonut() {
   const { repartition, isLoading } = useDashboardDepartements();
-  const [isClient, setIsClient] = useState(false);
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
   const safeRepartition = repartition
     .map((d, index) => ({
       ...d,
@@ -67,10 +63,10 @@ export default function DepartementsDonut() {
           <PieIcon className="h-10 w-10 text-text-tertiary" />
           <p className="mt-3 text-sm text-text-secondary">Aucun employé en base</p>
         </div>
-      ) : isClient ? (
+      ) : (
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
           <div className="relative h-[220px] w-full min-w-0">
-            <ResponsiveContainer width="100%" height="100%" minWidth={180} minHeight={220}>
+            <ChartContainer height={220} minWidth={180} className="h-full">
               <PieChart>
                 <Tooltip content={<CustomTooltip total={total} />} />
                 <Pie
@@ -90,7 +86,7 @@ export default function DepartementsDonut() {
                   ))}
                 </Pie>
               </PieChart>
-            </ResponsiveContainer>
+            </ChartContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <span className="font-mono text-3xl font-bold text-slate-900">{total}</span>
               <span className="text-[10px] uppercase tracking-widest text-slate-500">
@@ -123,8 +119,6 @@ export default function DepartementsDonut() {
             })}
           </div>
         </div>
-      ) : (
-        <Skeleton className="mt-4 h-[220px]" />
       )}
     </GlassCard>
   );

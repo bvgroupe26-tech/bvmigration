@@ -41,15 +41,6 @@ export default function LoginPage() {
             <Suspense fallback={<div className="h-48 w-full animate-pulse rounded-xl bg-slate-100" />}>
               <LoginForm />
             </Suspense>
-
-            <div className="mt-6 rounded-xl border border-[#d9e4f5] bg-[#f4f8ff] p-3.5 text-center">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#1F3F73]">
-                Compte de démonstration
-              </p>
-              <p className="mt-1 font-mono text-[11px] text-slate-600">
-                admin@bvgroupe.com · Admin@2026
-              </p>
-            </div>
           </div>
         </LoginCardEntrance>
 

@@ -32,7 +32,14 @@ export default function AbsenceForm({ onSuccess, onCancel }: Props) {
 
   const submit = handleSubmit(async (data) => {
     try {
-      await apiClient.post("/absences", data);
+      await apiClient.post("/absences", {
+        employeId: data.employe_id,
+        dateDebut: data.date_debut,
+        dateFin: data.date_fin,
+        typeAbsence: data.type_absence,
+        justification: data.justification || undefined,
+        statut: data.statut,
+      });
       toast.success("Demande d absence enregistree");
       onSuccess?.();
     } catch (err) {

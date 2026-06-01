@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useForm, Controller, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -17,6 +18,7 @@ import { Field, Input, NativeSelect } from "@/components/ui/Field";
 import MoneyInput from "@/components/ui/MoneyInput";
 import Button from "@/components/ui/Button";
 import type { Employe } from "@/lib/types";
+import { usePostes } from "@/hooks/usePostes";
 
 const DEPARTEMENT_SUGGESTIONS = [
   "Tech",
@@ -124,6 +126,14 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
   }, [employe, reset]);
 
   const statut = watch("statut");
+  const posteValue = watch("poste");
+  const { postes } = usePostes();
+  const posteOptions = useMemo(() => {
+    const labels = new Set(postes);
+    const current = typeof posteValue === "string" ? posteValue.trim() : "";
+    if (current) labels.add(current);
+    return Array.from(labels).sort((a, b) => a.localeCompare(b, "fr"));
+  }, [postes, posteValue]);
 
   const onSubmit = handleSubmit(async (data) => {
     try {
@@ -298,7 +308,19 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Poste" required error={errors.poste?.message}>
-          <Input placeholder="Développeur Senior" {...register("poste")} />
+          <NativeSelect {...register("poste")} defaultValue="">
+            <option value="">— Choisir un poste —</option>
+            {posteOptions.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </NativeSelect>
+          <p className="text-[11px] text-slate-500">
+            <Link href="/employes/postes" className="font-medium text-[#2F5F9D] hover:text-[#1F3F73]">
+              Gérer le référentiel des postes
+            </Link>
+          </p>
         </Field>
         <Field label="Département" required hint="Saisie libre (suggestions ci-dessous)" error={errors.departement?.message}>
           <Input list="employe-departements" placeholder="Ex. Finance" {...register("departement")} />

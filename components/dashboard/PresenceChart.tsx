@@ -1,19 +1,19 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Area,
   AreaChart,
   CartesianGrid,
   Legend,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { motion } from "framer-motion";
 import { TrendingUp, BarChart3 } from "lucide-react";
-import { useEffect, useState } from "react";
 import GlassCard from "@/components/ui/GlassCard";
+import ChartContainer from "@/components/ui/ChartContainer";
 import Skeleton from "@/components/ui/Skeleton";
 import { useDashboardPresences } from "@/hooks/api";
 import { isDailyPresencesChart } from "@/lib/dashboard-utils";
@@ -85,14 +85,14 @@ export default function PresenceChart() {
             Enregistrez des présences pour voir l&apos;évolution.
           </p>
         </div>
-      ) : isClient ? (
+      ) : (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="mt-5 h-[280px]"
+          className="mt-5"
         >
-          <ResponsiveContainer width="100%" height="100%" minWidth={240} minHeight={280}>
+          <ChartContainer height={280} minWidth={240}>
             <AreaChart data={chart} margin={{ top: 8, right: 8, bottom: 0, left: -10 }}>
               <defs>
                 <linearGradient id="grad-presents" x1="0" y1="0" x2="0" y2="1">
@@ -125,10 +125,8 @@ export default function PresenceChart() {
               <Area type="monotone" name="absents" dataKey="absents" stroke="#EF4444" strokeWidth={2} fill="url(#grad-absents)" animationDuration={1100} />
               <Area type="monotone" name="retards" dataKey="retards" stroke="#F59E0B" strokeWidth={2} fill="url(#grad-retards)" animationDuration={1300} />
             </AreaChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </motion.div>
-      ) : (
-        <Skeleton className="mt-5 h-[280px]" />
       )}
     </GlassCard>
   );

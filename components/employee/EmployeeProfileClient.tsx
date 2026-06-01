@@ -1,20 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Camera, Save } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Save } from "lucide-react";
 import { toast } from "sonner";
-import { useEmployeMe, updateEmployeMe, uploadAvatar } from "@/hooks/employee";
+import { useEmployeMe, updateEmployeMe } from "@/hooks/employee";
+import { useProfilePhoto } from "@/hooks/useProfilePhoto";
+import ProfilePhotoEditor from "@/components/profile/ProfilePhotoEditor";
 import { EmployeeError, EmployeeLoading } from "@/components/employee/EmployeeState";
-import {cn, getInitials, getAvatarGradient, getUserErrorMessage } from "@/lib/utils";
+import { getUserErrorMessage } from "@/lib/utils";
 import { formatDate } from "@/lib/employee/utils";
 
 export default function EmployeeProfileClient() {
   const { employe, isLoading, error, mutate } = useEmployeMe();
+  const { photoUrl, uploading, uploadPhoto } = useProfilePhoto();
   const [telephone, setTelephone] = useState("");
   const [adresse, setAdresse] = useState("");
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (employe) {
@@ -25,9 +26,6 @@ export default function EmployeeProfileClient() {
 
   if (isLoading) return <EmployeeLoading />;
   if (error) return <EmployeeError message="Impossible de charger votre profil." />;
-
-  const initials = getInitials(employe?.nom ?? "", employe?.prenom);
-  const gradient = getAvatarGradient(`${employe?.prenom ?? ""}${employe?.nom ?? ""}`);
 
   async function handleSave() {
     setSaving(true);
@@ -42,52 +40,31 @@ export default function EmployeeProfileClient() {
     }
   }
 
-  async function handleAvatarChange(file: File | undefined) {
-    if (!file) return;
-    setUploading(true);
+  async function handlePhoto(file: File | undefined) {
     try {
-      await uploadAvatar(file);
+      await uploadPhoto(file);
       await mutate();
-      toast.success("Photo mise à jour");
+      toast.success("Photo de profil mise à jour");
     } catch (err) {
-      toast.error(getUserErrorMessage(err, "Impossible d'envoyer le fichier."));
-    } finally {
-      setUploading(false);
+      toast.error(getUserErrorMessage(err, "Impossible d'envoyer la photo."));
     }
   }
 
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          className="relative mx-auto block"
-          disabled={uploading}
-        >
-          <div
-            className={cn(
-              "mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br font-display text-2xl font-bold text-white shadow-md",
-              gradient
-            )}
-          >
-            {initials}
-          </div>
-          <span className="absolute -bottom-1 -right-1 inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-[#2F5F9D] text-white shadow">
-            <Camera className="h-4 w-4" />
-          </span>
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => handleAvatarChange(e.target.files?.[0])}
+        <ProfilePhotoEditor
+          nom={employe?.nom ?? ""}
+          prenom={employe?.prenom}
+          photoUrl={photoUrl}
+          uploading={uploading}
+          onPickFile={handlePhoto}
         />
         <h1 className="mt-4 font-display text-xl font-bold text-slate-900">
           {employe?.prenom} {employe?.nom}
         </h1>
         <p className="mt-1 text-sm text-slate-500">{employe?.email ?? employe?.matricule}</p>
+        <p className="mt-2 text-xs text-slate-500">Appuyez sur l&apos;icône appareil photo pour changer votre photo.</p>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">

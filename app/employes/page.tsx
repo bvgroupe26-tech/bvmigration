@@ -118,7 +118,14 @@ export default function EmployesPage() {
       header: "Employé",
       render: (e) => (
         <div className="flex items-center gap-3 group">
-          <Avatar nom={e.nom} prenom={e.prenom} size="sm" showStatus status={e.statut === "actif" ? "online" : "offline"} />
+          <Avatar
+            nom={e.nom}
+            prenom={e.prenom}
+            src={e.avatar}
+            size="sm"
+            showStatus
+            status={e.statut === "actif" ? "online" : "offline"}
+          />
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold text-slate-900 group-hover:text-[#1F3F73] transition">
               {e.prenom} {e.nom}
@@ -247,7 +254,14 @@ export default function EmployesPage() {
             Gérez l&apos;équipe BV GROUPE et leurs informations.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/employes/postes"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-transparent px-4 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+          >
+            <Briefcase className="h-4 w-4" />
+            Postes
+          </Link>
           <Button variant="ghost" icon={<Download className="h-4 w-4" />} onClick={exportExcel}>
             Exporter
           </Button>

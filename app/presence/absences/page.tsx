@@ -38,6 +38,12 @@ const TYPE_LABELS: Record<string, string> = {
   autre: "Autre",
 };
 
+const STATUT_LABELS: Record<string, string> = {
+  en_attente: "En attente",
+  approuve: "Approuvée",
+  refuse: "Refusée",
+};
+
 export default function AbsencesPage() {
   const [statutFilter, setStatutFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState<AbsenceType | "all">("all");
@@ -82,17 +88,22 @@ export default function AbsencesPage() {
     {
       key: "employe",
       header: "Employé",
-      render: (a) => (
-        <Link href={`/employes/${a.employe_id}`} className="flex items-center gap-3 group">
-          <Avatar nom={a.employe_nom ?? "?"} prenom={a.employe_prenom ?? ""} size="sm" />
-          <div className="min-w-0">
-            <p className="truncate font-semibold text-slate-900 group-hover:text-[#1F3F73] transition">
-              {a.employe_prenom} {a.employe_nom}
-            </p>
-            <p className="truncate text-xs text-text-tertiary">{a.employe_poste ?? "—"}</p>
-          </div>
-        </Link>
-      ),
+      render: (a) => {
+        const nom = a.employe_nom?.trim() || "—";
+        const prenom = a.employe_prenom?.trim() || "";
+        const label = [prenom, nom].filter(Boolean).join(" ").trim() || "Employé inconnu";
+        return (
+          <Link href={`/employes/${a.employe_id}`} className="flex items-center gap-3 group">
+            <Avatar nom={nom !== "—" ? nom : "?"} prenom={prenom} size="sm" />
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-slate-900 group-hover:text-[#1F3F73] transition">
+                {label}
+              </p>
+              <p className="truncate text-xs text-text-tertiary">{a.employe_poste ?? "—"}</p>
+            </div>
+          </Link>
+        );
+      },
     },
     {
       key: "type",
@@ -106,11 +117,14 @@ export default function AbsencesPage() {
     {
       key: "duree",
       header: "Durée",
-      render: (a) => (
-        <span className="text-xs font-semibold text-slate-800">
-          {absenceDureeJours(a)} j
-        </span>
-      ),
+      render: (a) => {
+        const days = absenceDureeJours(a);
+        return (
+          <span className="text-xs font-semibold text-slate-800">
+            {days > 0 ? `${days} j` : "—"}
+          </span>
+        );
+      },
     },
     {
       key: "periode",
@@ -133,7 +147,7 @@ export default function AbsencesPage() {
       header: "Statut",
       render: (a) => (
         <StatBadge variant={a.statut as "en_attente" | "approuve" | "refuse"}>
-          {a.statut.replace("_", " ")}
+          {STATUT_LABELS[a.statut] ?? a.statut.replace("_", " ")}
         </StatBadge>
       ),
     },

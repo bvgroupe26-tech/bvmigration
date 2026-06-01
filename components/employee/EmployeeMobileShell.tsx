@@ -11,6 +11,7 @@ import BottomNavBar from "@/components/layout/BottomNavBar";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
 import { EMPLOYEE_MOBILE_TABS, EMPLOYEE_NAV, getEmployeePageTitle, isNavActive } from "@/lib/nav-config";
 import { useAuth } from "@/context/AuthContext";
+import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import { cn, getAvatarGradient, getInitials } from "@/lib/utils";
 
 type EmployeeMobileShellProps = {
@@ -58,6 +59,7 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
     window.addEventListener("resize", logLayout);
     return () => window.removeEventListener("resize", logLayout);
   }, [pathname]);
+  const { photoUrl } = useProfilePhoto();
   const initials = getInitials(user.nom, user.prenom);
   const gradient = getAvatarGradient(`${user.prenom}${user.nom}`);
 
@@ -182,12 +184,17 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
               <Link
                 href="/employee/profile"
                 className={cn(
-                  "hidden h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br font-display text-sm font-bold text-white shadow-sm ring-2 ring-white sm:inline-flex lg:hidden",
-                  gradient
+                  "hidden h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br font-display text-sm font-bold text-white shadow-sm ring-2 ring-white sm:inline-flex lg:hidden",
+                  !photoUrl && gradient
                 )}
                 aria-label="Mon profil"
               >
-                {initials}
+                {photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
               </Link>
               <Link
                 href="/employee/profile"

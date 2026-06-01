@@ -5,12 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import {
-  LogOut,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 import { ADMIN_NAV, isNavActive } from "@/lib/nav-config";
 import { cn, getInitials, getAvatarGradient } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import { getUserErrorMessage } from "@/lib/fetcher";
 
 type NavItem = {
@@ -29,13 +28,16 @@ type SidebarProps = {
     prenom: string;
     role: string;
   };
+  /** Layout bureau (web large ou PWA desktop) — affiche la sidebar fixe */
+  desktop?: boolean;
   className?: string;
 };
 
-export default function Sidebar({ user, className }: SidebarProps) {
+export default function Sidebar({ user, desktop = false, className }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
+  const { photoUrl } = useProfilePhoto();
 
   async function handleLogout() {
     try {
@@ -55,8 +57,10 @@ export default function Sidebar({ user, className }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "z-30 hidden w-[260px] shrink-0 overflow-hidden bg-[#1F3F73] text-white shadow-[4px_0_24px_rgba(15,23,42,0.12)]",
-        "lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:h-[100dvh] lg:flex-col",
+        "z-30 w-[260px] shrink-0 overflow-hidden bg-[#1F3F73] text-white shadow-[4px_0_24px_rgba(15,23,42,0.12)]",
+        desktop
+          ? "fixed inset-y-0 left-0 flex h-[100dvh] flex-col"
+          : "hidden",
         className
       )}
     >
@@ -131,25 +135,38 @@ export default function Sidebar({ user, className }: SidebarProps) {
         </nav>
 
         <div className="border-t border-white/10 px-4 py-4">
-          <div className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-white/8">
-            <div
+          <div className="flex items-center gap-2">
+            <Link
+              href="/profile"
               className={cn(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-display text-sm font-bold text-white ring-2 ring-white/20",
-                gradient
+                "flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-white/8",
+                pathname.startsWith("/profile") && "bg-white/10 ring-1 ring-white/10"
               )}
             >
-              {initials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white">
-                {user ? `${user.prenom} ${user.nom}` : "Admin RH"}
-              </p>
-              <p className="truncate text-xs capitalize text-white/50">{user?.role ?? "admin"}</p>
-            </div>
+              <div
+                className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br font-display text-sm font-bold text-white ring-2 ring-white/20",
+                  !photoUrl && gradient
+                )}
+              >
+                {photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-white">
+                  {user ? `${user.prenom} ${user.nom}` : "Admin RH"}
+                </p>
+                <p className="truncate text-xs capitalize text-white/50">{user?.role ?? "admin"}</p>
+              </div>
+            </Link>
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-lg p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
+              className="shrink-0 rounded-lg p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
               aria-label="Se déconnecter"
             >
               <LogOut className="h-4 w-4" />

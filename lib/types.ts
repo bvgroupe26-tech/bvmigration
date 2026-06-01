@@ -30,6 +30,7 @@ export type Employe = {
   def_taux_cnss: number | null;
   def_taux_impot: number | null;
   statut: EmployeStatut;
+  avatar?: string | null;
   created_at: string;
   updated_at: string;
 };

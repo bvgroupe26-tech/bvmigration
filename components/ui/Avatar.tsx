@@ -1,10 +1,12 @@
 "use client";
 
 import { cn, getAvatarGradient, getInitials } from "@/lib/utils";
+import { resolveAvatarUrl } from "@/lib/avatar-utils";
 
 type AvatarProps = {
   nom: string;
   prenom?: string | null;
+  src?: string | null;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
   className?: string;
   showStatus?: boolean;
@@ -28,6 +30,7 @@ const STATUS: Record<NonNullable<AvatarProps["status"]>, string> = {
 export default function Avatar({
   nom,
   prenom,
+  src,
   size = "md",
   className,
   showStatus = false,
@@ -35,17 +38,23 @@ export default function Avatar({
 }: AvatarProps) {
   const initials = getInitials(nom, prenom);
   const gradient = getAvatarGradient(`${prenom ?? ""}${nom}`);
+  const photoUrl = resolveAvatarUrl(src ?? null);
 
   return (
     <div className={cn("relative inline-flex shrink-0", className)}>
       <div
         className={cn(
-          "flex items-center justify-center rounded-full bg-gradient-to-br font-display font-bold text-white ring-1 ring-white/10 shadow-sm",
-          gradient,
+          "flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-br font-display font-bold text-white ring-1 ring-white/10 shadow-sm",
+          !photoUrl && gradient,
           SIZES[size]
         )}
       >
-        {initials}
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          initials
+        )}
       </div>
       {showStatus && (
         <span

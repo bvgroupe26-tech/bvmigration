@@ -44,8 +44,17 @@ function notifyRefreshFailure(error: unknown): void {
 async function ensureFreshAccessToken(path: string): Promise<boolean> {
   if (isAuthApiPath(path)) return false;
 
-  // Refresh déjà en cours (authClient ou intercepteur) — attendre sans relancer
-  if (getIsRefreshing() || isInterceptorRefreshing) {
+  // Refresh authClient en cours — rejoindre la même promesse (évite deadlock apiClient)
+  if (getIsRefreshing()) {
+    try {
+      await refreshAccessToken();
+      return Boolean(getAccessToken());
+    } catch {
+      return false;
+    }
+  }
+
+  if (isInterceptorRefreshing) {
     try {
       await subscribeRefresh();
       return Boolean(getAccessToken());

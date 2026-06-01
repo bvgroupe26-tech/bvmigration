@@ -48,6 +48,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/statistiques", label: "Statistiques", icon: BarChart3 },
   { href: "/employes", label: "Employés", icon: Users },
+  { href: "/employes/postes", label: "Postes", icon: Briefcase, isSubItem: true },
   { href: "/presence", label: "Présence", icon: Clock },
   { href: "/presence/absences", label: "Absences", icon: CalendarOff, isSubItem: true },
   { href: "/paie", label: "Paie", icon: Wallet },
@@ -55,9 +56,10 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/recrutement", label: "Recrutement", icon: Briefcase },
   { href: "/competences", label: "Compétences", icon: GraduationCap },
   { href: "/competences/evaluations", label: "Évaluations", icon: ChartLine, isSubItem: true },
+  { href: "/profile", label: "Mon profil", icon: User },
 ];
 
-/** Onglets barre du bas admin (mobile / tablette) */
+/** Onglets barre du bas admin (mobile / PWA) */
 export const ADMIN_MOBILE_TABS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", shortLabel: "Accueil", icon: LayoutDashboard },
   { href: "/employes", label: "Employés", shortLabel: "Employés", icon: Users },
@@ -68,8 +70,10 @@ export const ADMIN_MOBILE_TABS: NavItem[] = [
 
 /** Entrées du tiroir « Menu » admin mobile */
 export const ADMIN_MOBILE_DRAWER: NavItem[] = [
+  { href: "/profile", label: "Mon profil", icon: User },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/statistiques", label: "Statistiques", icon: BarChart3 },
+  { href: "/employes/postes", label: "Postes", icon: Briefcase },
   { href: "/presence/absences", label: "Absences", icon: CalendarOff },
   { href: "/budget", label: "Budget", icon: Landmark },
   { href: "/recrutement", label: "Recrutement", icon: Briefcase },

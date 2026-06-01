@@ -257,7 +257,24 @@ body::before {
   opacity: 0.35;
 }
 
+@keyframes bv-welcome-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.bv-welcome-logo-spin {
+  animation: bv-welcome-logo-spin 2.8s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .bv-welcome-logo-spin {
+    animation: none !important;
+  }
+
   .landing-blob-1,
   .landing-blob-2,
   .landing-blob-3,

@@ -63,12 +63,6 @@ export default function Navbar() {
 
         <div className="flex items-center gap-2">
           <Link
-            href="/register"
-            className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-white/90 ring-1 ring-white/20 transition hover:bg-white/10 sm:inline-flex"
-          >
-            S&apos;inscrire
-          </Link>
-          <Link
             href="/login"
             className="group relative inline-flex h-11 items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-[#2F5F9D] to-[#1F3F73] px-5 text-sm font-semibold text-white shadow-md transition hover:shadow-lg"
           >

@@ -4,13 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform, useInView } from "framer-motion";
 import { useRef } from "react";
 import { ArrowDownRight, ArrowUpRight, type LucideIcon } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
+import { Area, AreaChart, Tooltip } from "recharts";
 import GlassCard from "./GlassCard";
+import ChartContainer from "./ChartContainer";
 import { cn, formatFCFA, formatNumber, formatPercent } from "@/lib/utils";
 
 export type KPIColor = "blue" | "green" | "cyan" | "amber" | "red" | "violet";
@@ -209,9 +205,8 @@ export default function KPICard({
         </div>
 
         {isClient && data.length > 0 && (
-          <div className="mt-3 h-12 min-h-12 w-full min-w-0 -mx-1">
-            <ResponsiveContainer width="100%" height={48} minWidth={120} minHeight={48}>
-              <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+          <ChartContainer height={48} minWidth={120} className="mt-3 -mx-1">
+            <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id={theme.gradId} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={theme.sparkStroke} stopOpacity={0.45} />
@@ -229,8 +224,7 @@ export default function KPICard({
                 />
                 <Tooltip content={<SparkTooltip />} cursor={false} />
               </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          </ChartContainer>
         )}
       </GlassCard>
     </motion.div>

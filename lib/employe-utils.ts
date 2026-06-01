@@ -58,6 +58,7 @@ export function normalizeEmploye(raw: unknown): Employe {
         ? null
         : num(pick(o, "def_taux_impot", "defTauxImpot")),
     statut: (String(o.statut ?? "actif") as Employe["statut"]),
+    avatar: str(o.avatar ?? pick(o, "avatar_url", "avatarUrl")),
     created_at: String(pick(o, "created_at", "createdAt") ?? ""),
     updated_at: String(pick(o, "updated_at", "updatedAt") ?? ""),
   };
@@ -84,5 +85,6 @@ export function normalizeEmployeMe(raw: unknown): EmployeMe {
     date_embauche: e.date_embauche,
     date_fin_contrat: e.date_fin_contrat,
     statut: e.statut,
+    avatar: e.avatar,
   };
 }

@@ -5,6 +5,9 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
 import { useMemo } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useProfilePhoto } from "@/hooks/useProfilePhoto";
+import { cn, getAvatarGradient, getInitials } from "@/lib/utils";
 
 const ROUTE_LABELS: Record<string, string> = {
   "": "Dashboard",
@@ -28,6 +31,7 @@ const ROUTE_LABELS: Record<string, string> = {
   depenses: "Dépenses",
   login: "Connexion",
   register: "Inscription",
+  profile: "Mon profil",
 };
 
 function labelizeSegment(segment: string): string {
@@ -36,8 +40,16 @@ function labelizeSegment(segment: string): string {
   return segment.charAt(0).toUpperCase() + segment.slice(1);
 }
 
-export default function Header() {
+type HeaderProps = {
+  desktop?: boolean;
+};
+
+export default function Header({ desktop = false }: HeaderProps) {
   const pathname = usePathname() || "/";
+  const { user } = useAuth();
+  const { photoUrl } = useProfilePhoto();
+  const initials = user ? getInitials(user.nom, user.prenom) : "RH";
+  const gradient = user ? getAvatarGradient(`${user.prenom}${user.nom}`) : "from-[#2F5F9D] to-[#1F3F73]";
 
   const segments = useMemo(
     () => pathname.split("/").filter(Boolean),
@@ -47,11 +59,26 @@ export default function Header() {
   const title = segments.length === 0 ? "Dashboard RH" : labelizeSegment(segments[segments.length - 1]);
 
   return (
-    <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-white pt-safe lg:static">
+    <header
+      className={cn(
+        "z-20 shrink-0 border-b border-slate-200 bg-white pt-safe",
+        desktop ? "static" : "sticky top-0"
+      )}
+    >
       <div className="h-0.5 bg-gradient-to-r from-[#1F3F73] via-[#2F5F9D] to-[#F2C94C]" />
-      <div className="flex items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:px-8">
+      <div
+        className={cn(
+          "flex items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6",
+          desktop && "px-8"
+        )}
+      >
         <div className="min-w-0 flex-1">
-          <nav className="hidden min-h-4 items-center gap-1.5 text-xs leading-tight text-slate-500 sm:flex">
+          <nav
+            className={cn(
+              "min-h-4 items-center gap-1.5 text-xs leading-tight text-slate-500",
+              desktop ? "flex" : "hidden sm:flex"
+            )}
+          >
             <Link href="/dashboard" className="transition hover:text-[#2F5F9D]">
               Accueil
             </Link>
@@ -72,12 +99,38 @@ export default function Header() {
               );
             })}
           </nav>
-          <h1 className="truncate font-display text-lg font-bold leading-tight tracking-tight text-[#1F3F73] sm:text-[22px] lg:text-[24px]">
+          <h1
+            className={cn(
+              "truncate font-display font-bold leading-tight tracking-tight text-[#1F3F73]",
+              desktop ? "text-[24px]" : "text-lg sm:text-[22px]"
+            )}
+          >
             {title}
           </h1>
         </div>
 
-        <NotificationsBell context="admin" />
+        <div className="flex shrink-0 items-center gap-2">
+          <NotificationsBell context="admin" />
+          {user && (
+            <Link
+              href="/profile"
+              className={cn(
+                "inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br font-display text-sm font-bold text-white shadow-sm ring-2 ring-white transition hover:ring-[#2F5F9D]/30",
+                !photoUrl && gradient,
+                pathname.startsWith("/profile") && "ring-[#2F5F9D]"
+              )}
+              aria-label="Mon profil"
+              title="Mon profil"
+            >
+              {photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
+            </Link>
+          )}
+        </div>
       </div>
     </header>
   );

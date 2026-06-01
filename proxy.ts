@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { decodeJwtPayload, getHomeRouteByRole, isJwtExpired } from "@/lib/session";
+import { decodeJwtPayload, isJwtExpired, normalizeAppRole } from "@/lib/session";
 
 const LEGACY_TOKEN_COOKIE = "bv-token";
 const REFRESH_COOKIE = "refresh_token";
 
-const PUBLIC_PAGES = new Set(["/", "/login", "/register", "/register/employee"]);
+const PUBLIC_PAGES = new Set(["/", "/login"]);
 
-function parseRoleFromToken(token: string): string | null {
+function parseRoleFromToken(token: string): ReturnType<typeof normalizeAppRole> {
   const payload = decodeJwtPayload(token);
-  return payload?.role?.toString() ?? null;
+  return normalizeAppRole(payload?.role?.toString());
 }
 
 function getLegacyToken(req: NextRequest): string | null {
@@ -56,7 +56,7 @@ export function proxy(req: NextRequest) {
 
   const role = parseRoleFromToken(legacyToken);
 
-  if (pathname.startsWith("/employee") && role !== "employee") {
+  if (pathname.startsWith("/employee") && role && role !== "employee") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

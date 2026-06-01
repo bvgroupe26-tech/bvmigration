@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,6 +41,7 @@ export default function LoginForm() {
     "";
 
   const safeRedirect = redirectTo.startsWith("/") && !redirectTo.startsWith("//") ? redirectTo : "";
+  const noPublicSignup = searchParams.get("notice") === "no-public-signup";
 
   const onSubmit = handleSubmit(async (data) => {
     try {
@@ -57,6 +57,12 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
+      {noPublicSignup ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
+          L&apos;inscription en ligne n&apos;est pas disponible. Votre compte est créé par le service RH.
+        </p>
+      ) : null}
+
       <Field label="Email" required error={errors.email?.message}>
         <div className="relative">
           <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -106,16 +112,7 @@ export default function LoginForm() {
       </Button>
 
       <p className="text-center text-sm text-slate-600">
-        Employé BV Group ?{" "}
-        <Link href="/register/employee" className="font-semibold text-[#2F5F9D] hover:text-[#1F3F73]">
-          Créer un compte employé
-        </Link>
-      </p>
-      <p className="text-center text-xs text-slate-500">
-        Espace RH / Manager ?{" "}
-        <Link href="/register" className="font-medium text-slate-600 underline-offset-2 hover:underline">
-          Inscription administration
-        </Link>
+        Pas encore de compte ? Contactez le service RH — seuls les responsables RH créent les accès.
       </p>
     </form>
   );

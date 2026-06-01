@@ -18,6 +18,11 @@ import {
 } from "@/lib/paie-utils";
 import { normalizeEmploye, normalizeEmployeList } from "@/lib/employe-utils";
 import { normalizePresence, normalizePresenceList } from "@/lib/presence-utils";
+import {
+  enrichAbsencesWithEmployes,
+  normalizeAbsenceList,
+  unwrapAbsenceListPayload,
+} from "@/lib/absence-utils";
 import { normalizeStatistiquesSynthese } from "@/lib/statistiques-utils";
 import type {
   Employe,
@@ -204,13 +209,45 @@ export function usePresencesToday() {
 }
 
 // ============ Absences ============
+async function fetchAbsences(url: string): Promise<Absence[]> {
+  const raw = await fetcher<unknown>(url);
+  let list = normalizeAbsenceList(raw);
+
+  try {
+    const empsRaw = await fetcher<unknown>("/employes?limit=500");
+    const employes = normalizeEmployeList(empsRaw);
+    list = enrichAbsencesWithEmployes(list, employes);
+  } catch {
+    /* liste employés optionnelle */
+  }
+
+  if (process.env.NODE_ENV === "development" && list.length > 0) {
+    const sample = unwrapAbsenceListPayload(raw)[0];
+    const first = list[0];
+    const sampleKeys =
+      sample && typeof sample === "object" && !Array.isArray(sample)
+        ? Object.keys(sample as Record<string, unknown>)
+        : [];
+    console.info("[absences] clés API 1er enregistrement:", sampleKeys);
+    console.info("[absences] après normalisation:", {
+      employe_id: first.employe_id,
+      nom: first.employe_nom,
+      date_debut: first.date_debut,
+      date_fin: first.date_fin,
+      type: first.type_absence,
+    });
+  }
+
+  return list;
+}
+
 export function useAbsences(filters?: {
   employe_id?: number;
   statut?: string;
   type_absence?: string;
 }) {
   const url = `/absences${qs(filters ?? {})}`;
-  const { data, error, isLoading, mutate } = useSWR<Absence[]>(url, fetcher, SHORT);
+  const { data, error, isLoading, mutate } = useSWR<Absence[]>(url, fetchAbsences, SHORT);
   return { absences: data ?? [], isLoading, error, mutate };
 }
 

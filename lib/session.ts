@@ -1,5 +1,23 @@
 export type AppRole = "admin" | "manager" | "rh" | "employee";
 
+const ADMIN_ROLES: AppRole[] = ["admin", "manager", "rh"];
+
+/** Rôle API / JWT → clé interne (évite blocage AuthGuard si casse différente). */
+export function normalizeAppRole(role?: string | null): AppRole | null {
+  if (!role || typeof role !== "string") return null;
+  const key = role.trim().toLowerCase();
+  if (key === "employee" || key === "employe" || key === "employé") return "employee";
+  if (key === "admin" || key === "administrator" || key === "superadmin") return "admin";
+  if (key === "manager" || key === "gestionnaire") return "manager";
+  if (key === "rh" || key === "hr" || key === "ressources_humaines") return "rh";
+  return null;
+}
+
+export function isAdminRole(role?: string | null): boolean {
+  const normalized = normalizeAppRole(role);
+  return normalized !== null && ADMIN_ROLES.includes(normalized);
+}
+
 type JwtPayload = {
   role?: AppRole | string;
   exp?: number;
@@ -12,7 +30,7 @@ type JwtPayload = {
 };
 
 export function getHomeRouteByRole(role?: string | null): string {
-  return role === "employee" ? "/employee/dashboard" : "/dashboard";
+  return normalizeAppRole(role) === "employee" ? "/employee/dashboard" : "/dashboard";
 }
 
 export function decodeJwtPayload(token: string): JwtPayload | null {
