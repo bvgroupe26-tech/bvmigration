@@ -1,24 +1,20 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { UserMePayload } from "@/lib/employee/types";
-import { apiGet } from "@/lib/apiClient";
 import { resolveApiBaseUrl } from "@/lib/resolve-api-url";
 import {
-  getAccessToken,
   loginRequest,
   logout as authLogout,
-  refreshAccessToken,
   resetAuthSessionState,
+  restoreSessionAccessToken,
   type LoginCredentials,
 } from "@/lib/authClient";
 import { decodeJwtPayload, getHomeRouteByRole, normalizeAppRole } from "@/lib/session";
 import AuthLoading from "@/components/auth/AuthLoading";
 
 const PUBLIC_PATHS = new Set(["/", "/login"]);
-
-const SESSION_BOOT_TIMEOUT_MS = 22_000;
 
 type AuthContextValue = {
   user: UserMePayload | null;
@@ -79,19 +75,15 @@ function enrichUserProfile(profile: UserMePayload, accessToken?: string): UserMe
   return profile;
 }
 
-async function fetchCurrentUser(token?: string): Promise<UserMePayload> {
-  if (token) {
-    const res = await fetch(`${resolveApiBaseUrl()}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-      credentials: "include",
-      cache: "no-store",
-    });
-    const json = await res.json().catch(() => null);
-    if (!res.ok) throw new Error("Session invalide");
-    return enrichUserProfile(unwrapUserMePayload(json), token);
-  }
-  const profile = await apiGet<UserMePayload>("/auth/me");
-  return enrichUserProfile(unwrapUserMePayload(profile), getAccessToken() ?? undefined);
+async function fetchCurrentUser(accessToken: string): Promise<UserMePayload> {
+  const res = await fetch(`${resolveApiBaseUrl()}/auth/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    credentials: "include",
+    cache: "no-store",
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error("Session invalide");
+  return enrichUserProfile(unwrapUserMePayload(json), accessToken);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -100,86 +92,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname() || "/";
   const router = useRouter();
-  const skipNextBootstrapRef = useRef(false);
-  const bootstrapGenRef = useRef(0);
-  const userRef = useRef(user);
-  const isAuthenticatedRef = useRef(isAuthenticated);
-  userRef.current = user;
-  isAuthenticatedRef.current = isAuthenticated;
 
-  const refreshSession = useCallback(async () => {
-    const token = await refreshAccessToken();
-    const profile = await fetchCurrentUser(token);
-    setUser(enrichUserProfile(profile, token));
+  const applyUser = useCallback((profile: UserMePayload) => {
+    setUser(profile);
     setIsAuthenticated(true);
   }, []);
 
+  const clearUser = useCallback(() => {
+    setUser(null);
+    setIsAuthenticated(false);
+  }, []);
+
+  const bootstrap = useCallback(async () => {
+    const token = await restoreSessionAccessToken();
+    const profile = await fetchCurrentUser(token);
+    applyUser(profile);
+    return profile;
+  }, [applyUser]);
+
+  const refreshSession = useCallback(async () => {
+    await bootstrap();
+  }, [bootstrap]);
+
   useEffect(() => {
-    const generation = ++bootstrapGenRef.current;
     let cancelled = false;
 
-    const finish = () => {
-      if (!cancelled && generation === bootstrapGenRef.current) {
-        setIsLoading(false);
-      }
-    };
-
-    const init = async () => {
-      const isPublic = PUBLIC_PATHS.has(pathname);
-
-      if (isPublic) {
-        finish();
-        return;
-      }
-
-      if (skipNextBootstrapRef.current) {
-        skipNextBootstrapRef.current = false;
-        finish();
-        return;
-      }
-
-      const existingToken = getAccessToken();
-      if (isAuthenticatedRef.current && userRef.current && existingToken) {
-        finish();
+    const run = async () => {
+      if (PUBLIC_PATHS.has(pathname)) {
+        if (!cancelled) setIsLoading(false);
         return;
       }
 
       try {
-        const token = await refreshAccessToken();
-        if (cancelled || generation !== bootstrapGenRef.current) return;
-
-        const profile = await fetchCurrentUser(token);
-        if (cancelled || generation !== bootstrapGenRef.current) return;
-
-        setUser(enrichUserProfile(profile, token));
-        setIsAuthenticated(true);
+        await bootstrap();
       } catch {
-        if (cancelled || generation !== bootstrapGenRef.current) return;
-        setUser(null);
-        setIsAuthenticated(false);
-        resetAuthSessionState();
+        if (!cancelled) {
+          clearUser();
+          resetAuthSessionState();
+        }
       } finally {
-        finish();
+        if (!cancelled) setIsLoading(false);
       }
     };
 
-    const watchdog = window.setTimeout(() => {
-      if (cancelled || generation !== bootstrapGenRef.current) return;
-      resetAuthSessionState();
-      setUser(null);
-      setIsAuthenticated(false);
-      finish();
-    }, SESSION_BOOT_TIMEOUT_MS);
-
-    void init().finally(() => {
-      window.clearTimeout(watchdog);
-    });
-
+    void run();
     return () => {
       cancelled = true;
-      window.clearTimeout(watchdog);
     };
-  }, [pathname]);
+  }, [pathname, bootstrap, clearUser]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -194,35 +154,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (isAuthenticated && user && pathname === "/login") {
       router.replace(getHomeRouteByRole(user.role));
     }
-
-    // Redirection depuis `/` gérée par WelcomeSplash (écran de bienvenue).
   }, [isAuthenticated, isLoading, pathname, router, user]);
 
-  const login = useCallback(async (credentials: LoginCredentials) => {
-    resetAuthSessionState();
-    const result = await loginRequest(credentials);
+  const login = useCallback(
+    async (credentials: LoginCredentials) => {
+      const result = await loginRequest(credentials);
 
-    let profile: UserMePayload;
-    if (result.user) {
-      profile = enrichUserProfile(result.user, result.accessToken);
-    } else {
-      profile = await fetchCurrentUser(result.accessToken);
-    }
+      let profile: UserMePayload;
+      if (result.user) {
+        profile = enrichUserProfile(result.user, result.accessToken);
+      } else {
+        profile = await fetchCurrentUser(result.accessToken);
+      }
 
-    skipNextBootstrapRef.current = true;
-    setUser(profile);
-    setIsAuthenticated(true);
-    setIsLoading(false);
-    return profile;
-  }, []);
+      applyUser(profile);
+      setIsLoading(false);
+      return profile;
+    },
+    [applyUser]
+  );
 
   const logout = useCallback(async () => {
-    setUser(null);
-    setIsAuthenticated(false);
+    clearUser();
     setIsLoading(false);
-    skipNextBootstrapRef.current = false;
     await authLogout();
-  }, []);
+  }, [clearUser]);
 
   const value = useMemo(
     () => ({

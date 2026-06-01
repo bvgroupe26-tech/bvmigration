@@ -1,11 +1,15 @@
 "use client";
 
 import type { UserMePayload } from "@/lib/employee/types";
+import { decodeJwtPayload, isJwtExpired } from "@/lib/session";
 
 /** BFF Next (même origine) — relaie les cookies HttpOnly vers NestJS */
 export const AUTH_REFRESH_URL = "/api/auth/refresh";
 const AUTH_LOGIN_URL = "/api/auth/login";
 const AUTH_LOGOUT_URL = "/api/auth/logout";
+const SET_TOKEN_URL = "/api/set-token";
+
+export const ACCESS_TOKEN_COOKIE = "bv-token";
 
 let accessToken: string | null = null;
 let isRefreshing = false;
@@ -23,15 +27,47 @@ export function setAccessToken(token: string | null): void {
   accessToken = token;
 }
 
+/** Lit le jeton stocké dans le cookie `bv-token` (survit au rechargement / mobile). */
+export function readPersistedAccessToken(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${ACCESS_TOKEN_COOKIE}=([^;]*)`));
+  if (!match?.[1]) return null;
+  try {
+    const token = decodeURIComponent(match[1]);
+    if (token.split(".").length !== 3) return null;
+    const payload = decodeJwtPayload(token);
+    if (!payload || isJwtExpired(payload)) return null;
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+export function getAccessToken(): string | null {
+  if (accessToken) return accessToken;
+  const persisted = readPersistedAccessToken();
+  if (persisted) {
+    accessToken = persisted;
+    return persisted;
+  }
+  return null;
+}
+
+export function getIsRefreshing(): boolean {
+  return isRefreshing;
+}
+
 /** Réinitialise l’état client après déconnexion (évite les blocages sur mobile). */
 export function resetAuthSessionState(): void {
   accessToken = null;
   if (isRefreshing) {
-    const err = new Error("Session fermée");
-    notifyRefreshFailure(err);
+    notifyRefreshFailure(new Error("Session fermée"));
   }
   isRefreshing = false;
   refreshWaiters = [];
+  if (typeof document !== "undefined") {
+    document.cookie = `${ACCESS_TOKEN_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
+  }
 }
 
 async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
@@ -47,14 +83,6 @@ async function authFetch(url: string, init: RequestInit = {}): Promise<Response>
   } finally {
     clearTimeout(timeoutId);
   }
-}
-
-export function getAccessToken(): string | null {
-  return accessToken;
-}
-
-export function getIsRefreshing(): boolean {
-  return isRefreshing;
 }
 
 type AuthTokenPayload = {
@@ -85,6 +113,29 @@ function notifyRefreshSuccess(token: string): void {
 function notifyRefreshFailure(error: unknown): void {
   refreshWaiters.forEach(({ reject }) => reject(error));
   refreshWaiters = [];
+}
+
+/** Enregistre le jeton côté navigateur (cookie `bv-token` via BFF). */
+export async function persistAccessToken(token: string): Promise<void> {
+  setAccessToken(token);
+  try {
+    await authFetch(SET_TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+  } catch {
+    /* le serveur a peut-être déjà posé le cookie lors du login/refresh */
+  }
+}
+
+export async function clearPersistedAccessToken(): Promise<void> {
+  resetAuthSessionState();
+  try {
+    await authFetch(SET_TOKEN_URL, { method: "DELETE" });
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -125,7 +176,7 @@ export async function refreshAccessToken(): Promise<string> {
       throw new Error("Jeton d'accès introuvable.");
     }
 
-    setAccessToken(token);
+    await persistAccessToken(token);
     notifyRefreshSuccess(token);
     return token;
   } catch (error) {
@@ -142,8 +193,20 @@ export async function refreshAccessToken(): Promise<string> {
   }
 }
 
+/**
+ * Restaure la session : cookie bv-token → sinon refresh HttpOnly.
+ */
+export async function restoreSessionAccessToken(): Promise<string> {
+  const cached = readPersistedAccessToken();
+  if (cached) {
+    setAccessToken(cached);
+    return cached;
+  }
+  return refreshAccessToken();
+}
+
 export async function logout(): Promise<void> {
-  resetAuthSessionState();
+  await clearPersistedAccessToken();
   try {
     await authFetch(AUTH_LOGOUT_URL, {
       method: "POST",
@@ -168,6 +231,8 @@ export async function loginRequest(credentials: LoginCredentials): Promise<{
   accessToken: string;
   user?: UserMePayload;
 }> {
+  resetAuthSessionState();
+
   const res = await authFetch(AUTH_LOGIN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -189,6 +254,6 @@ export async function loginRequest(credentials: LoginCredentials): Promise<{
     throw new Error("Réponse de connexion invalide.");
   }
 
-  setAccessToken(token);
+  await persistAccessToken(token);
   return { accessToken: token, user: payload.user };
 }

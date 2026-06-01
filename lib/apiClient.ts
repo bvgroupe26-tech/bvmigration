@@ -132,7 +132,11 @@ export async function apiFetch<T>(
       if (refreshed) {
         return apiFetch<T>(path, options, false);
       }
-      if (!getAccessToken()) {
+      if (
+        !getAccessToken() &&
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/login")
+      ) {
         await logout();
       }
       return parseResponse<T>(res, path);

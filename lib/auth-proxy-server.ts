@@ -1,11 +1,14 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { TOKEN_COOKIE_NAME } from "@/lib/auth";
+import { getTokenMaxAgeSeconds } from "@/lib/session";
 
 const DEFAULT_LOCAL_API = "http://127.0.0.1:3001";
 const DEFAULT_PROD_API = "https://bv-groupe.onrender.com";
 
 export const REFRESH_COOKIE_NAME = "refresh_token";
+const TOKEN_MAX_AGE = 60 * 60 * 24 * 7;
 
 /** URL absolue de l'API Nest (côté serveur Next uniquement). */
 export function getNestApiBase(): string {
@@ -38,7 +41,6 @@ function parseSetCookieHeader(raw: string): ParsedCookie | null {
   let path = "/";
   let httpOnly = false;
   let secure = process.env.NODE_ENV === "production";
-  /** Lax par défaut : cookie first-party (Vercel) — « none » uniquement si imposé par l’API. */
   let sameSite: "lax" | "strict" | "none" = "lax";
 
   for (const part of parts.slice(1)) {
@@ -56,6 +58,39 @@ function parseSetCookieHeader(raw: string): ParsedCookie | null {
   return { name, value, maxAge, path, httpOnly, secure, sameSite };
 }
 
+function extractAccessTokenFromBody(body: string): string | null {
+  try {
+    const json = JSON.parse(body) as Record<string, unknown>;
+    const data = json?.data !== undefined ? json.data : json;
+    if (typeof data === "string" && data.split(".").length === 3) return data;
+    if (data && typeof data === "object") {
+      const o = data as Record<string, unknown>;
+      const token = o.access_token ?? o.accessToken ?? o.token;
+      if (typeof token === "string" && token) return token;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+async function setAccessTokenCookie(token: string): Promise<void> {
+  const jar = await cookies();
+  jar.set(TOKEN_COOKIE_NAME, token, {
+    httpOnly: false,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: getTokenMaxAgeSeconds(token, TOKEN_MAX_AGE),
+  });
+}
+
+async function clearAuthCookies(): Promise<void> {
+  const jar = await cookies();
+  jar.delete(REFRESH_COOKIE_NAME);
+  jar.delete(TOKEN_COOKIE_NAME);
+}
+
 async function applySetCookiesFromUpstream(upstream: Response): Promise<void> {
   const list =
     typeof upstream.headers.getSetCookie === "function"
@@ -68,10 +103,23 @@ async function applySetCookiesFromUpstream(upstream: Response): Promise<void> {
   if (rawCookies.length === 0) return;
 
   const jar = await cookies();
+  const isProd = process.env.NODE_ENV === "production";
 
   for (const raw of rawCookies) {
     const parsed = parseSetCookieHeader(raw);
     if (!parsed) continue;
+
+    const nameLower = parsed.name.toLowerCase();
+    if (nameLower === "refresh_token" || nameLower === "refreshtoken") {
+      jar.set(REFRESH_COOKIE_NAME, parsed.value, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: "lax",
+        path: "/",
+        maxAge: parsed.maxAge && parsed.maxAge > 0 ? parsed.maxAge : 60 * 60 * 24 * 30,
+      });
+      continue;
+    }
 
     jar.set(parsed.name, parsed.value, {
       httpOnly: parsed.httpOnly,
@@ -106,10 +154,15 @@ export async function proxyAuthToNest(
   const body = await upstream.text();
 
   if (clearRefreshCookie) {
-    const jar = await cookies();
-    jar.delete(REFRESH_COOKIE_NAME);
+    await clearAuthCookies();
   } else {
     await applySetCookiesFromUpstream(upstream);
+    if (upstream.ok && (path === "/auth/login" || path === "/auth/refresh")) {
+      const accessToken = extractAccessTokenFromBody(body);
+      if (accessToken) {
+        await setAccessTokenCookie(accessToken);
+      }
+    }
   }
 
   return new NextResponse(body, {
