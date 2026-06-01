@@ -57,6 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
+      const isPublic = PUBLIC_PATHS.has(pathname);
+
+      if (isPublic) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const token = await refreshAccessToken();
         const profile = await fetchCurrentUser(token);
@@ -71,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     void init();
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     if (isLoading) return;
