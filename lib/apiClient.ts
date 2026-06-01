@@ -59,9 +59,8 @@ async function ensureFreshAccessToken(path: string): Promise<boolean> {
     await refreshAccessToken();
     notifyRefreshSuccess();
     return true;
-  } catch {
-    notifyRefreshFailure(new Error("refresh_failed"));
-    await logout();
+  } catch (error) {
+    notifyRefreshFailure(error);
     return false;
   } finally {
     isInterceptorRefreshing = false;
@@ -124,6 +123,10 @@ export async function apiFetch<T>(
       if (refreshed) {
         return apiFetch<T>(path, options, false);
       }
+      if (!getAccessToken()) {
+        await logout();
+      }
+      return parseResponse<T>(res, path);
     }
 
     return parseResponse<T>(res, path);

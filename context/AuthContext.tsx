@@ -4,8 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { usePathname, useRouter } from "next/navigation";
 import type { UserMePayload } from "@/lib/employee/types";
 import { apiGet } from "@/lib/apiClient";
+import { resolveApiBaseUrl } from "@/lib/resolve-api-url";
 import {
-  getAccessToken,
   loginRequest,
   logout as authLogout,
   refreshAccessToken,
@@ -27,7 +27,17 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function fetchCurrentUser(): Promise<UserMePayload> {
+async function fetchCurrentUser(token?: string): Promise<UserMePayload> {
+  if (token) {
+    const res = await fetch(`${resolveApiBaseUrl()}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+      cache: "no-store",
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok) throw new Error("Session invalide");
+    return (json?.data ?? json) as UserMePayload;
+  }
   return apiGet<UserMePayload>("/auth/me");
 }
 
@@ -39,8 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const refreshSession = useCallback(async () => {
-    await refreshAccessToken();
-    const profile = await fetchCurrentUser();
+    const token = await refreshAccessToken();
+    const profile = await fetchCurrentUser(token);
     setUser(profile);
     setIsAuthenticated(true);
   }, []);
@@ -48,16 +58,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const init = async () => {
       try {
-        await refreshAccessToken();
-        const profile = await fetchCurrentUser();
+        const token = await refreshAccessToken();
+        const profile = await fetchCurrentUser(token);
         setUser(profile);
         setIsAuthenticated(true);
       } catch {
-        // Pas de session (visiteur) ou refresh invalide — normal
-        if (!getAccessToken()) {
-          setUser(null);
-          setIsAuthenticated(false);
-        }
+        setUser(null);
+        setIsAuthenticated(false);
       } finally {
         setIsLoading(false);
       }
