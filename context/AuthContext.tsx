@@ -119,40 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const profile = await fetchCurrentUser(token);
         setUser(profile);
         setIsAuthenticated(true);
-        // #region agent log
-        fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-          body: JSON.stringify({
-            sessionId: "cd157f",
-            runId: "admin-auth",
-            hypothesisId: "A3",
-            location: "AuthContext.tsx:init:ok",
-            message: "session init ok",
-            data: { pathname, role: profile.role },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-      } catch (err) {
-        // #region agent log
-        fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-          body: JSON.stringify({
-            sessionId: "cd157f",
-            runId: "admin-auth",
-            hypothesisId: "A1-A2",
-            location: "AuthContext.tsx:init:fail",
-            message: "session init failed",
-            data: {
-              pathname,
-              error: err instanceof Error ? err.message : "unknown",
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
+      } catch {
         setUser(null);
         setIsAuthenticated(false);
       } finally {

@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { TitlebarLayoutShell } from "@/components/Titlebar";
 import { AuthProvider } from "@/context/AuthContext";
 import PushNotificationsRoot from "@/components/push/PushNotificationsRoot";
+import ChunkLoadRecovery from "@/components/pwa/ChunkLoadRecovery";
 import PwaInstallPrompt from "@/components/pwa/PwaInstallPrompt";
 import "./globals.css";
 
@@ -73,6 +74,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           <TitlebarLayoutShell>
+            <ChunkLoadRecovery />
             <PushNotificationsRoot />
             {children}
             <PwaInstallPrompt />

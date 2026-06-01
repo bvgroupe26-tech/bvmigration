@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -30,35 +30,6 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
   const mainContentRef = useRef<HTMLDivElement>(null);
   const title = getEmployeePageTitle(pathname);
 
-  useEffect(() => {
-    const logLayout = () => {
-      const el = mainContentRef.current;
-      const rect = el?.getBoundingClientRect();
-      // #region agent log
-      fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-        body: JSON.stringify({
-          sessionId: "cd157f",
-          runId: "pre-fix",
-          hypothesisId: "R1-R3",
-          location: "EmployeeMobileShell.tsx:layout",
-          message: "viewport vs content width",
-          data: {
-            innerWidth: window.innerWidth,
-            contentWidth: rect?.width ?? null,
-            contentLeft: rect?.left ?? null,
-            lgBreakpoint: window.matchMedia("(min-width: 1024px)").matches,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-    };
-    logLayout();
-    window.addEventListener("resize", logLayout);
-    return () => window.removeEventListener("resize", logLayout);
-  }, [pathname]);
   const { photoUrl } = useProfilePhoto();
   const initials = getInitials(user.nom, user.prenom);
   const gradient = getAvatarGradient(`${user.prenom}${user.nom}`);

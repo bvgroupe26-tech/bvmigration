@@ -23,21 +23,6 @@ export default function PushNotificationsRoot() {
     if (isElectron() || isLoading || !isAuthenticated || !user || !isSupported) return;
     if (permission !== "granted" || isSubscribed || loading) return;
 
-    // #region agent log
-    fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-      body: JSON.stringify({
-        sessionId: "cd157f",
-        runId: "pre-fix",
-        hypothesisId: "H4",
-        location: "PushNotificationsRoot.tsx:autoSubscribe",
-        message: "auto subscribe triggered",
-        data: { permission, isSubscribed, loading },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     void subscribe();
   }, [user, isAuthenticated, isSupported, permission, isSubscribed, loading, isLoading, subscribe]);
 

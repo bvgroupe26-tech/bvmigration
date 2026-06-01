@@ -8,8 +8,17 @@ const withPWA = withPWAInit({
   sw: "sw.js",
   customWorkerSrc: "worker",
   customWorkerDest: "public",
+  /** Évite de mettre en cache les navigations RSC (souvent en cause sur mobile après déploiement). */
+  cacheOnFrontEndNav: false,
+  aggressiveFrontEndNavCaching: false,
+  reloadOnOnline: true,
   fallbacks: {
     document: "/offline",
+  },
+  workboxOptions: {
+    disableDevLogs: true,
+    navigateFallback: "/offline",
+    navigateFallbackDenylist: [/^\/api\//, /^\/_next\//, /^\/login/],
   },
 });
 

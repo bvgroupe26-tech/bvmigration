@@ -38,7 +38,8 @@ function parseSetCookieHeader(raw: string): ParsedCookie | null {
   let path = "/";
   let httpOnly = false;
   let secure = process.env.NODE_ENV === "production";
-  let sameSite: "lax" | "strict" | "none" = secure ? "none" : "lax";
+  /** Lax par défaut : cookie first-party (Vercel) — « none » uniquement si imposé par l’API. */
+  let sameSite: "lax" | "strict" | "none" = "lax";
 
   for (const part of parts.slice(1)) {
     const lower = part.toLowerCase();

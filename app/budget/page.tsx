@@ -1,19 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import {
-  ResponsiveContainer,
-  ComposedChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from "recharts";
 import BudgetSubNav from "@/components/budget/BudgetSubNav";
 import GlassCard from "@/components/ui/GlassCard";
 import Button from "@/components/ui/Button";
@@ -21,33 +12,55 @@ import SectionHeader from "@/components/ui/SectionHeader";
 import Skeleton from "@/components/ui/Skeleton";
 import { useBudgetSynthese } from "@/hooks/api";
 import { formatFCFA } from "@/lib/utils";
+import { getUserErrorMessage } from "@/lib/api-errors";
 
-const CHART_TT = {
-  contentStyle: {
-    background: "#fff",
-    border: "1px solid rgba(15,23,42,0.1)",
-    borderRadius: "10px",
-    fontSize: "12px",
-  },
-};
+const BudgetMonthlyChart = dynamic(() => import("@/components/budget/BudgetMonthlyChart"), {
+  ssr: false,
+  loading: () => <Skeleton className="mt-4 h-[280px] w-full rounded-xl" />,
+});
 
 export default function BudgetOverviewPage() {
   const router = useRouter();
   const year = new Date().getFullYear();
   const [annee, setAnnee] = useState(year);
-  const { synthese, isLoading, mutate } = useBudgetSynthese(annee);
+  const { synthese, isLoading, error, mutate } = useBudgetSynthese(annee);
 
   const taux = useMemo(() => {
     if (!synthese) return null;
     return synthese.totaux.taux_consommation_pct;
   }, [synthese]);
 
-  if (isLoading || !synthese) {
+  if (isLoading) {
     return (
       <div className="space-y-4">
         <BudgetSubNav />
         <Skeleton className="h-40 w-full rounded-2xl" />
         <Skeleton className="h-80 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <BudgetSubNav />
+        <GlassCard className="p-6 text-center">
+          <p className="text-sm text-slate-600">{getUserErrorMessage(error)}</p>
+          <Button variant="primary" className="mt-4" onClick={() => void mutate()}>
+            Réessayer
+          </Button>
+        </GlassCard>
+      </div>
+    );
+  }
+
+  if (!synthese) {
+    return (
+      <div className="space-y-4">
+        <BudgetSubNav />
+        <GlassCard className="p-6 text-center">
+          <p className="text-sm text-slate-600">Aucune donnée budgétaire pour cet exercice.</p>
+        </GlassCard>
       </div>
     );
   }
@@ -113,18 +126,7 @@ export default function BudgetOverviewPage() {
           title="Dépenses mensuelles"
           subtitle="Montants saisis (tous statuts sauf refusé) sur 12 mois glissants"
         />
-        <div className="mt-4 h-[280px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={synthese.depenses_par_mois} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,23,42,0.06)" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748b" }} interval={1} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
-              <Tooltip {...CHART_TT} formatter={(value) => [formatFCFA(Number(value)), ""]} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="montant" fill="#6366f1" name="Montant (FCFA)" radius={[4, 4, 0, 0]} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+        <BudgetMonthlyChart data={synthese.depenses_par_mois} />
       </GlassCard>
 
       <GlassCard className="p-5">
