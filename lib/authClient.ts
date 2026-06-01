@@ -1,10 +1,11 @@
 "use client";
 
-import { resolveApiBaseUrl } from "@/lib/resolve-api-url";
 import type { UserMePayload } from "@/lib/employee/types";
 
-/** Route unique de refresh — proxy Next → NestJS */
-export const AUTH_REFRESH_URL = "/api/nest/auth/refresh";
+/** BFF Next (même origine) — relaie les cookies HttpOnly vers NestJS */
+export const AUTH_REFRESH_URL = "/api/auth/refresh";
+const AUTH_LOGIN_URL = "/api/auth/login";
+const AUTH_LOGOUT_URL = "/api/auth/logout";
 
 let accessToken: string | null = null;
 let isRefreshing = false;
@@ -35,10 +36,6 @@ type AuthTokenPayload = {
   user?: UserMePayload;
 };
 
-function resolveApiUrl(path: string): string {
-  return path.startsWith("http") ? path : `${resolveApiBaseUrl()}${path}`;
-}
-
 function unwrapPayload<T>(json: unknown): T {
   if (json && typeof json === "object" && "data" in json) {
     return (json as { data: T }).data;
@@ -63,7 +60,7 @@ function notifyRefreshFailure(error: unknown): void {
 }
 
 /**
- * POST /api/nest/auth/refresh — cookie HttpOnly refresh uniquement (pas de body).
+ * POST /api/auth/refresh — cookie HttpOnly refresh uniquement (pas de body).
  */
 export async function refreshAccessToken(): Promise<string> {
   if (isRefreshing) {
@@ -115,7 +112,7 @@ export async function refreshAccessToken(): Promise<string> {
 
 export async function logout(): Promise<void> {
   try {
-    await fetch(resolveApiUrl("/auth/logout"), {
+    await fetch(AUTH_LOGOUT_URL, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -140,7 +137,7 @@ export async function loginRequest(credentials: LoginCredentials): Promise<{
   accessToken: string;
   user?: UserMePayload;
 }> {
-  const res = await fetch(resolveApiUrl("/auth/login"), {
+  const res = await fetch(AUTH_LOGIN_URL, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },

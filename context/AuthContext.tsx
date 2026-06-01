@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return result.user;
     }
 
-    const profile = await fetchCurrentUser();
+    const profile = await fetchCurrentUser(result.accessToken);
     setUser(profile);
     setIsAuthenticated(true);
     setIsLoading(false);

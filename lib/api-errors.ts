@@ -40,7 +40,10 @@ export function isTechnicalMessage(message: string): boolean {
 }
 
 export function isAuthApiPath(path: string): boolean {
-  return /^(\/api\/nest)?\/auth\/(login|register|refresh|logout)/.test(path);
+  return (
+    /^(\/api\/nest)?\/auth\/(login|register|refresh|logout)/.test(path) ||
+    /^\/api\/auth\/(login|logout|refresh)/.test(path)
+  );
 }
 
 export function messageForHttpStatus(status: number, context: ApiErrorContext = "default"): string {
