@@ -10,7 +10,6 @@ import {
   TrendingUp,
   Briefcase,
   Plus,
-  Search,
   Pencil,
   Trash2,
   Download,
@@ -22,6 +21,7 @@ import StatBadge from "@/components/ui/StatBadge";
 import Avatar from "@/components/ui/Avatar";
 import SectionHeader from "@/components/ui/SectionHeader";
 import DataTable, { type Column } from "@/components/ui/DataTable";
+import SearchField from "@/components/ui/SearchField";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Skeleton from "@/components/ui/Skeleton";
@@ -280,16 +280,12 @@ export default function EmployesPage() {
 
       <GlassCard className="p-5">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher un employé..."
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-text-tertiary"
-            />
-          </div>
+          <SearchField
+            wrapperClassName="min-w-[240px] flex-1"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un employé..."
+          />
           <select
             value={departement}
             onChange={(e) => setDepartement(e.target.value)}

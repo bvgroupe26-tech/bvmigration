@@ -2,7 +2,8 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from "lucide-react";
+import SearchField from "@/components/ui/SearchField";
 import { cn } from "@/lib/utils";
 
 export type Column<T> = {
@@ -91,19 +92,15 @@ export default function DataTable<T>({
   return (
     <div className="space-y-3">
       {searchable && (
-        <div className="relative max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            placeholder={searchPlaceholder}
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-[#2F5F9D] focus:outline-none focus:ring-2 focus:ring-[#E8F0FA]"
-          />
-        </div>
+        <SearchField
+          wrapperClassName="max-w-xs"
+          placeholder={searchPlaceholder}
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+        />
       )}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
