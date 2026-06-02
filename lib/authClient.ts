@@ -1,7 +1,12 @@
 "use client";
 
 import type { UserMePayload } from "@/lib/employee/types";
-import { decodeJwtPayload, isJwtExpired } from "@/lib/session";
+import {
+  decodeJwtPayload,
+  isAccessTokenUsable,
+  isJwtExpired,
+  shouldRefreshAccessToken,
+} from "@/lib/session";
 
 /** BFF Next (même origine) — relaie les cookies HttpOnly vers NestJS */
 export const AUTH_REFRESH_URL = "/api/auth/refresh";
@@ -28,23 +33,28 @@ export function setAccessToken(token: string | null): void {
 }
 
 /** Lit le jeton stocké dans le cookie `bv-token` (survit au rechargement / mobile). */
-export function readPersistedAccessToken(): string | null {
+/** Lit le cookie bv-token même si le JWT est expiré (pour déclencher un refresh). */
+export function readPersistedAccessTokenRaw(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(?:^|; )${ACCESS_TOKEN_COOKIE}=([^;]*)`));
   if (!match?.[1]) return null;
   try {
     const token = decodeURIComponent(match[1]);
-    if (token.split(".").length !== 3) return null;
-    const payload = decodeJwtPayload(token);
-    if (!payload || isJwtExpired(payload)) return null;
-    return token;
+    return token.split(".").length === 3 ? token : null;
   } catch {
     return null;
   }
 }
 
+export function readPersistedAccessToken(): string | null {
+  const token = readPersistedAccessTokenRaw();
+  return isAccessTokenUsable(token) ? token : null;
+}
+
 export function getAccessToken(): string | null {
-  if (accessToken) return accessToken;
+  if (accessToken && isAccessTokenUsable(accessToken)) return accessToken;
+  if (accessToken && !isAccessTokenUsable(accessToken)) accessToken = null;
+
   const persisted = readPersistedAccessToken();
   if (persisted) {
     accessToken = persisted;
@@ -194,15 +204,31 @@ export async function refreshAccessToken(): Promise<string> {
 }
 
 /**
- * Restaure la session : cookie bv-token → sinon refresh HttpOnly.
+ * Renouvelle le jeton si absent, expiré ou proche de l'expiration.
  */
-export async function restoreSessionAccessToken(): Promise<string> {
-  const cached = readPersistedAccessToken();
-  if (cached) {
-    setAccessToken(cached);
-    return cached;
+export async function ensureValidAccessToken(): Promise<string> {
+  const current = getAccessToken() ?? readPersistedAccessTokenRaw();
+  if (current && !shouldRefreshAccessToken(current)) {
+    setAccessToken(current);
+    return current;
   }
   return refreshAccessToken();
+}
+
+/**
+ * Restaure la session : jeton valide en cache → sinon refresh (cookie HttpOnly).
+ */
+export async function restoreSessionAccessToken(): Promise<string> {
+  return ensureValidAccessToken();
+}
+
+/** Rafraîchissement silencieux (retour app, timer) — ne propage pas l'erreur. */
+export async function trySilentRefresh(): Promise<string | null> {
+  try {
+    return await ensureValidAccessToken();
+  } catch {
+    return null;
+  }
 }
 
 export async function logout(): Promise<void> {

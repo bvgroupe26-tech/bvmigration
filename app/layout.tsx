@@ -3,6 +3,7 @@ import { Syne, JetBrains_Mono, DM_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { TitlebarLayoutShell } from "@/components/Titlebar";
 import { AuthProvider } from "@/context/AuthContext";
+import SessionKeeper from "@/components/auth/SessionKeeper";
 import PushNotificationsRoot from "@/components/push/PushNotificationsRoot";
 import ChunkLoadRecovery from "@/components/pwa/ChunkLoadRecovery";
 import PwaInstallPrompt from "@/components/pwa/PwaInstallPrompt";
@@ -73,6 +74,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
+          <SessionKeeper />
           <TitlebarLayoutShell>
             <ChunkLoadRecovery />
             <PushNotificationsRoot />

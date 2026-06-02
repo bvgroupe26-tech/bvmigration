@@ -10,11 +10,13 @@ import {
   resolveApiErrorContext,
 } from "@/lib/api-errors";
 import {
+  ensureValidAccessToken,
   getAccessToken,
   getIsRefreshing,
   logout,
   refreshAccessToken,
 } from "@/lib/authClient";
+import { shouldRefreshAccessToken } from "@/lib/session";
 
 export type ApiResponse<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -41,10 +43,21 @@ function notifyRefreshFailure(error: unknown): void {
   refreshWaiters = [];
 }
 
+/** Avant chaque appel API : renouveler si le JWT court expire bientôt. */
+async function maybeProactiveRefresh(path: string): Promise<void> {
+  if (isAuthApiPath(path)) return;
+  const token = getAccessToken();
+  if (!token || !shouldRefreshAccessToken(token)) return;
+  try {
+    await ensureValidAccessToken();
+  } catch {
+    /* 401 handler prendra le relais */
+  }
+}
+
 async function ensureFreshAccessToken(path: string): Promise<boolean> {
   if (isAuthApiPath(path)) return false;
 
-  // Refresh authClient en cours — rejoindre la même promesse (évite deadlock apiClient)
   if (getIsRefreshing()) {
     try {
       await refreshAccessToken();
@@ -116,6 +129,8 @@ export async function apiFetch<T>(
   options: RequestInit = {},
   retryOnUnauthorized = true
 ): Promise<ApiResponse<T>> {
+  await maybeProactiveRefresh(path);
+
   const url = path.startsWith("http") ? path : `${getBaseUrl()}${path}`;
   const headers = buildHeaders(options, true);
 

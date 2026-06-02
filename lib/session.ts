@@ -47,9 +47,40 @@ export function decodeJwtPayload(token: string): JwtPayload | null {
   }
 }
 
-export function isJwtExpired(payload: { exp?: number } | null): boolean {
+/** Marge horloge (secondes) avant de considérer le JWT comme expiré. */
+export const JWT_EXPIRY_SKEW_SEC = 30;
+
+/** Renouveler le jeton d'accès avant expiration (ex. JWT court côté Nest). */
+export const JWT_REFRESH_BUFFER_SEC = 120;
+
+export function isJwtExpired(
+  payload: { exp?: number } | null,
+  skewSeconds = JWT_EXPIRY_SKEW_SEC
+): boolean {
   if (!payload?.exp || typeof payload.exp !== "number") return false;
-  return payload.exp <= Math.floor(Date.now() / 1000);
+  return payload.exp <= Math.floor(Date.now() / 1000) + skewSeconds;
+}
+
+export function isJwtExpiringSoon(
+  payload: { exp?: number } | null,
+  bufferSeconds = JWT_REFRESH_BUFFER_SEC
+): boolean {
+  if (!payload?.exp || typeof payload.exp !== "number") return true;
+  return payload.exp <= Math.floor(Date.now() / 1000) + bufferSeconds;
+}
+
+export function isAccessTokenUsable(token: string | null | undefined): boolean {
+  if (!token || token.split(".").length !== 3) return false;
+  const payload = decodeJwtPayload(token);
+  return Boolean(payload && !isJwtExpired(payload));
+}
+
+export function shouldRefreshAccessToken(token: string | null | undefined): boolean {
+  if (!token || token.split(".").length !== 3) return true;
+  const payload = decodeJwtPayload(token);
+  if (!payload) return true;
+  if (isJwtExpired(payload)) return true;
+  return isJwtExpiringSoon(payload);
 }
 
 export function getTokenMaxAgeSeconds(token: string, fallbackSeconds: number): number {

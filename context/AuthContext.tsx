@@ -7,6 +7,7 @@ import { resolveApiBaseUrl } from "@/lib/resolve-api-url";
 import {
   loginRequest,
   logout as authLogout,
+  refreshAccessToken,
   resetAuthSessionState,
   restoreSessionAccessToken,
   type LoginCredentials,
@@ -104,10 +105,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const bootstrap = useCallback(async () => {
-    const token = await restoreSessionAccessToken();
-    const profile = await fetchCurrentUser(token);
-    applyUser(profile);
-    return profile;
+    let token = await restoreSessionAccessToken();
+    try {
+      const profile = await fetchCurrentUser(token);
+      applyUser(profile);
+      return profile;
+    } catch {
+      token = await refreshAccessToken();
+      const profile = await fetchCurrentUser(token);
+      applyUser(profile);
+      return profile;
+    }
   }, [applyUser]);
 
   const refreshSession = useCallback(async () => {
