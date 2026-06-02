@@ -61,12 +61,7 @@ export default function Header({ desktop = false }: HeaderProps) {
   const title = segments.length === 0 ? "Dashboard RH" : labelizeSegment(segments[segments.length - 1]);
 
   return (
-    <header
-      className={cn(
-        "z-20 shrink-0 border-b border-slate-200 bg-white pt-safe",
-        desktop ? "static" : "sticky top-0"
-      )}
-    >
+    <header className="no-print sticky top-0 z-30 shrink-0 border-b border-slate-200 bg-white/95 pt-safe backdrop-blur-md supports-[backdrop-filter]:bg-white/90">
       <div className="h-0.5 bg-gradient-to-r from-[#1F3F73] via-[#2F5F9D] to-[#F2C94C]" />
       <div
         className={cn(

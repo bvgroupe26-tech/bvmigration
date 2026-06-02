@@ -33,26 +33,21 @@ export default function AdminAppShell({ user, children }: AdminAppShellProps) {
   return (
     <div
       className={cn(
-        "relative z-10 flex min-h-[100dvh] bg-[#F4F7FB]",
-        desktop && "h-[100dvh] overflow-hidden"
+        "relative z-10 flex h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#F4F7FB]",
+        desktop && "min-h-0"
       )}
     >
       <Sidebar user={user} desktop={desktop} />
 
       <div
         className={cn(
-          "flex min-h-0 min-w-0 flex-1 flex-col bg-[#F8FAFC]",
-          desktop && "ml-[260px] h-[100dvh] overflow-hidden"
+          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#F8FAFC]",
+          desktop && "ml-[260px]"
         )}
       >
-        <Header desktop={desktop} />
-        <main
-          className={cn(
-            "shell-main min-h-0 flex-1 overflow-x-hidden",
-            desktop && "overflow-y-auto overscroll-contain"
-          )}
-        >
-          <div className="shell-content mx-auto w-full max-w-7xl">
+        <main className="shell-scroll min-h-0 flex-1 overflow-x-hidden">
+          <Header desktop={desktop} />
+          <div className="shell-main shell-content mx-auto w-full max-w-7xl">
             <PageTransition>{children}</PageTransition>
           </div>
         </main>

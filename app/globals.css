@@ -446,6 +446,16 @@ body::before {
   min-height: 100dvh;
 }
 
+/* Zone de scroll PWA / mobile : en-tête sticky, contenu qui passe en dessous */
+.shell-scroll {
+  min-height: 0;
+  flex: 1 1 0%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 @media (min-width: 1024px) {
   .shell-main-scroll {
     min-height: 0;

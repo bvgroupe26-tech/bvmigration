@@ -57,10 +57,15 @@ const nextConfig: NextConfig = {
   turbopack: {},
   serverExternalPackages: ["better-sqlite3", "electron"],
   async rewrites() {
+    const target = apiProxyTarget.replace(/\/$/, "");
     return [
       {
+        source: "/uploads/:path*",
+        destination: `${target}/uploads/:path*`,
+      },
+      {
         source: "/api/nest/:path*",
-        destination: `${apiProxyTarget}/api/:path*`,
+        destination: `${target}/api/:path*`,
       },
     ];
   },

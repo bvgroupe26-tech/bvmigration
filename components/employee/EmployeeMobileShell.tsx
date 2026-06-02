@@ -45,7 +45,7 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
   }
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#F8FAFC] lg:h-[100dvh] lg:overflow-hidden">
+    <div className="flex h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#F8FAFC]">
       {/* Sidebar desktop — fixe, seul le contenu défile */}
       <aside className="shell-sidebar hidden w-[260px] shrink-0 flex-col overflow-hidden bg-[#1F3F73] text-white shadow-[4px_0_24px_rgba(15,23,42,0.12)] lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:h-[100dvh]">
         <div className="border-b border-white/10 px-6 py-6">
@@ -131,65 +131,65 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
         </div>
       </aside>
 
-      {/* Colonne principale — scroll indépendant sur desktop */}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:ml-[260px] lg:h-[100dvh] lg:overflow-hidden">
-        <header className="no-print shrink-0 border-b border-slate-200/90 bg-white/95 pt-safe backdrop-blur-md lg:static">
-          <div className="shell-content mx-auto flex h-14 items-center justify-between gap-3 px-4 sm:h-16">
-            <div className="flex min-w-0 items-center gap-2.5 lg:gap-3">
-              <Image
-                src="/logo.png"
-                alt="BV Group"
-                width={36}
-                height={36}
-                className="h-9 w-9 shrink-0 rounded-xl shadow-sm ring-1 ring-slate-200 lg:hidden"
-              />
-              <div className="min-w-0">
-                <p className="truncate font-display text-base font-bold text-[#1F3F73] sm:text-lg">{title}</p>
-                <p className="truncate text-[11px] text-slate-500 sm:text-xs">
-                  {user.prenom} {user.nom} · BV Groupe
-                </p>
+      {/* Colonne principale — seul le main défile ; l'en-tête reste fixe au-dessus du scroll */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:ml-[260px]">
+        <main
+          ref={mainContentRef}
+          className="shell-scroll min-h-0 flex-1 overflow-x-hidden"
+        >
+          <header className="no-print sticky top-0 z-30 shrink-0 border-b border-slate-200/90 bg-white/95 pt-safe backdrop-blur-md supports-[backdrop-filter]:bg-white/90">
+            <div className="shell-content mx-auto flex h-14 items-center justify-between gap-3 px-4 sm:h-16">
+              <div className="flex min-w-0 items-center gap-2.5 lg:gap-3">
+                <Image
+                  src="/logo.png"
+                  alt="BV Group"
+                  width={36}
+                  height={36}
+                  className="h-9 w-9 shrink-0 rounded-xl shadow-sm ring-1 ring-slate-200 lg:hidden"
+                />
+                <div className="min-w-0">
+                  <p className="truncate font-display text-base font-bold text-[#1F3F73] sm:text-lg">{title}</p>
+                  <p className="truncate text-[11px] text-slate-500 sm:text-xs">
+                    {user.prenom} {user.nom} · BV Groupe
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <NotificationsBell context="employee" />
+                <Link
+                  href="/employee/profile"
+                  className={cn(
+                    "hidden h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br font-display text-sm font-bold text-white shadow-sm ring-2 ring-white sm:inline-flex lg:hidden",
+                    !photoUrl && gradient
+                  )}
+                  aria-label="Mon profil"
+                >
+                  {photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    initials
+                  )}
+                </Link>
+                <Link
+                  href="/employee/profile"
+                  className="hidden rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-[#2F5F9D] transition hover:bg-[#E8F0FA] lg:inline-flex"
+                >
+                  Mon profil
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 sm:h-10 sm:w-10"
+                  aria-label="Se déconnecter"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <NotificationsBell context="employee" />
-              <Link
-                href="/employee/profile"
-                className={cn(
-                  "hidden h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br font-display text-sm font-bold text-white shadow-sm ring-2 ring-white sm:inline-flex lg:hidden",
-                  !photoUrl && gradient
-                )}
-                aria-label="Mon profil"
-              >
-                {photoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photoUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  initials
-                )}
-              </Link>
-              <Link
-                href="/employee/profile"
-                className="hidden rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-[#2F5F9D] transition hover:bg-[#E8F0FA] lg:inline-flex"
-              >
-                Mon profil
-              </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 sm:h-10 sm:w-10"
-                aria-label="Se déconnecter"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </header>
+          </header>
 
-        <main className="shell-main min-h-0 flex-1 overflow-x-hidden lg:overflow-y-auto lg:overscroll-contain">
-          <div
-            ref={mainContentRef}
-            className="shell-content mx-auto w-full max-w-lg lg:max-w-4xl xl:max-w-5xl"
-          >
+          <div className="shell-main shell-content mx-auto w-full max-w-lg lg:max-w-4xl xl:max-w-5xl">
             {children}
           </div>
         </main>

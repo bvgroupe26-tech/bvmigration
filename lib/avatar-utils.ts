@@ -1,16 +1,55 @@
 const LOCAL_AVATAR_PREFIX = "bv-profile-avatar:";
 
+/** Extrait le chemin public `/uploads/...` depuis une valeur API hétérogène. */
+function extractUploadsPath(value: string): string | null {
+  const match = value.match(/\/uploads\/[A-Za-z0-9_./-]+/);
+  return match ? match[0] : null;
+}
+
 export function resolveAvatarUrl(avatar: string | null | undefined): string | null {
   if (!avatar?.trim()) return null;
   const value = avatar.trim();
+
   if (value.startsWith("data:") || value.startsWith("blob:")) return value;
-  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+
+  const uploadsPath = extractUploadsPath(value);
+  if (uploadsPath) return uploadsPath;
+
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    try {
+      const pathname = new URL(value).pathname;
+      if (pathname.startsWith("/uploads/")) return pathname;
+    } catch {
+      /* URL invalide */
+    }
+    return value;
+  }
+
+  if (value.startsWith("/uploads/")) return value;
+
+  // Anciennes URLs incorrectement préfixées par le proxy API
+  if (value.startsWith("/api/nest/uploads/")) {
+    return value.replace(/^\/api\/nest/, "");
+  }
+  if (value.startsWith("/api/uploads/")) {
+    return value.replace(/^\/api/, "");
+  }
+
   if (value.startsWith("/api/nest/")) return value;
   if (value.startsWith("/api/")) {
     return value.replace(/^\/api(?!\/nest)/, "/api/nest");
   }
+
   const path = value.startsWith("/") ? value : `/${value}`;
   return `/api/nest${path}`;
+}
+
+export function avatarCacheKey(avatar: string | null | undefined, version?: string | null): string | null {
+  const base = resolveAvatarUrl(avatar);
+  if (!base || base.startsWith("data:") || base.startsWith("blob:")) return base;
+  if (!version) return base;
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}v=${encodeURIComponent(version)}`;
 }
 
 export function readLocalProfileAvatar(userId: number): string | null {

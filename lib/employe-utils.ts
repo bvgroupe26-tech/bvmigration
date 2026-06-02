@@ -86,5 +86,6 @@ export function normalizeEmployeMe(raw: unknown): EmployeMe {
     date_fin_contrat: e.date_fin_contrat,
     statut: e.statut,
     avatar: e.avatar,
+    updated_at: e.updated_at,
   };
 }

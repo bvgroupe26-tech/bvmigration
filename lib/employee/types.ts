@@ -32,6 +32,7 @@ export type EmployeMe = {
   date_fin_contrat?: string | null;
   avatar?: string | null;
   statut?: string | null;
+  updated_at?: string | null;
 };
 
 export type AbsenceBalance = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera } from "lucide-react";
 import { cn, getAvatarGradient, getInitials } from "@/lib/utils";
 
@@ -29,21 +29,32 @@ export default function ProfilePhotoEditor({
   editable = true,
 }: ProfilePhotoEditorProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [imgError, setImgError] = useState(false);
   const initials = getInitials(nom, prenom);
   const gradient = getAvatarGradient(`${prenom ?? ""}${nom}`);
   const dims = SIZES[size];
+  const showPhoto = Boolean(photoUrl) && !imgError;
+
+  useEffect(() => {
+    setImgError(false);
+  }, [photoUrl]);
 
   const avatarNode = (
     <div
       className={cn(
         "relative mx-auto overflow-hidden bg-gradient-to-br font-display font-bold text-white shadow-md",
         dims.box,
-        !photoUrl && gradient
+        !showPhoto && gradient
       )}
     >
-      {photoUrl ? (
+      {showPhoto ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+        <img
+          src={photoUrl!}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setImgError(true)}
+        />
       ) : (
         <span className="flex h-full w-full items-center justify-center">{initials}</span>
       )}

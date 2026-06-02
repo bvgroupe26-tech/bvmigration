@@ -7,10 +7,10 @@ import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
 import { normalizeEmployeMe } from "@/lib/employe-utils";
 import {
+  avatarCacheKey,
   clearLocalProfileAvatar,
   fileToAvatarDataUrl,
   readLocalProfileAvatar,
-  resolveAvatarUrl,
   writeLocalProfileAvatar,
 } from "@/lib/avatar-utils";
 
@@ -18,6 +18,8 @@ export function useProfilePhoto() {
   const { user, refreshSession } = useAuth();
   const employeLinked = Boolean(user?.employeId);
   const [localAvatar, setLocalAvatar] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [avatarVersion, setAvatarVersion] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
   const { data: employe, mutate: mutateEmploye } = useSWR(
@@ -32,25 +34,37 @@ export function useProfilePhoto() {
   }, [user?.id]);
 
   const rawAvatar = employe?.avatar ?? user?.avatar ?? localAvatar;
-  const photoUrl = useMemo(() => resolveAvatarUrl(rawAvatar), [rawAvatar]);
+  const photoUrl = useMemo(() => {
+    if (previewUrl) return previewUrl;
+    const version = avatarVersion ?? employe?.updated_at ?? null;
+    return avatarCacheKey(rawAvatar, version);
+  }, [previewUrl, rawAvatar, avatarVersion, employe?.updated_at]);
 
   const uploadPhoto = useCallback(
     async (file: File | undefined) => {
       if (!file || !user) return;
       setUploading(true);
+      let optimisticPreview: string | null = null;
       try {
+        optimisticPreview = await fileToAvatarDataUrl(file);
+        setPreviewUrl(optimisticPreview);
+
         if (employeLinked) {
           await uploadAvatar(file);
           clearLocalProfileAvatar(user.id);
+          setAvatarVersion(String(Date.now()));
           await mutateEmploye();
           await refreshSession();
         } else {
-          const dataUrl = await fileToAvatarDataUrl(file);
-          writeLocalProfileAvatar(user.id, dataUrl);
-          setLocalAvatar(dataUrl);
+          writeLocalProfileAvatar(user.id, optimisticPreview);
+          setLocalAvatar(optimisticPreview);
         }
+      } catch (err) {
+        setPreviewUrl(null);
+        throw err;
       } finally {
         setUploading(false);
+        setPreviewUrl(null);
       }
     },
     [employeLinked, mutateEmploye, refreshSession, user]
