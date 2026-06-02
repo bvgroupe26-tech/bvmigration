@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 
+const OFFLINE_ASSETS_REVISION = "2";
+
 const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.DISABLE_PWA === "true",
@@ -18,7 +20,25 @@ const withPWA = withPWAInit({
   workboxOptions: {
     disableDevLogs: true,
     navigateFallback: "/offline",
-    navigateFallbackDenylist: [/^\/api\//, /^\/_next\//, /^\/login/],
+    navigateFallbackDenylist: [
+      /^\/api\//,
+      /^\/_next\//,
+      /^\/login/,
+      /^\/manifest\.webmanifest$/,
+      /^\/icons\//,
+      /^\/favicon/,
+      /\/.*\.[a-zA-Z0-9]+$/,
+    ],
+    additionalManifestEntries: [
+      { url: "/offline", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/login", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/dashboard", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/employes", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/presence", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/paie", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/budget", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/profile", revision: OFFLINE_ASSETS_REVISION },
+    ],
   },
 });
 
