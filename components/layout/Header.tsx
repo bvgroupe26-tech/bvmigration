@@ -32,6 +32,8 @@ const ROUTE_LABELS: Record<string, string> = {
   login: "Connexion",
   register: "Inscription",
   profile: "Mon profil",
+  administration: "Administration",
+  comptes: "Comptes Admin & RH",
 };
 
 function labelizeSegment(segment: string): string {

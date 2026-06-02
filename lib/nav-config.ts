@@ -16,6 +16,7 @@ import {
   Bell,
   User,
   Menu,
+  Shield,
 } from "lucide-react";
 
 export type NavItem = {
@@ -48,6 +49,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/statistiques", label: "Statistiques", icon: BarChart3 },
   { href: "/employes", label: "Employés", icon: Users },
+  { href: "/administration/comptes", label: "Comptes Admin & RH", icon: Shield, isSubItem: true },
   { href: "/employes/postes", label: "Postes", icon: Briefcase, isSubItem: true },
   { href: "/presence", label: "Présence", icon: Clock },
   { href: "/presence/absences", label: "Absences", icon: CalendarOff, isSubItem: true },
@@ -74,6 +76,7 @@ export const ADMIN_MOBILE_DRAWER: NavItem[] = [
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/statistiques", label: "Statistiques", icon: BarChart3 },
   { href: "/employes/postes", label: "Postes", icon: Briefcase },
+  { href: "/administration/comptes", label: "Comptes Admin & RH", icon: Shield },
   { href: "/presence/absences", label: "Absences", icon: CalendarOff },
   { href: "/budget", label: "Budget", icon: Landmark },
   { href: "/recrutement", label: "Recrutement", icon: Briefcase },

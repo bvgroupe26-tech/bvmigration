@@ -22,6 +22,28 @@ export const registerSchema = z
   });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
+/** Création de compte administration (admin, RH, manager) — réservée aux utilisateurs connectés. */
+export const staffAccountSchema = z
+  .object({
+    email: z.string().email("Email invalide").transform((s) => s.trim().toLowerCase()),
+    password: z.string().min(8, "Mot de passe : au moins 8 caractères"),
+    password_confirm: z.string().min(1, "Confirmation requise"),
+    nom: z.string().min(2, "Nom requis").transform((s) => s.trim()),
+    prenom: z.string().min(2, "Prénom requis").transform((s) => s.trim()),
+    role: z.enum(["admin", "rh", "manager"]).default("rh"),
+  })
+  .superRefine((data, ctx) => {
+    if (data.password !== data.password_confirm) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["password_confirm"],
+        message: "Les mots de passe ne correspondent pas",
+      });
+    }
+  });
+
+export type StaffAccountInput = z.infer<typeof staffAccountSchema>;
+
 /** Montant FCFA ≥ 0 : vide / invalide → 0 ; espaces retirés ; virgule décimale acceptée (ex. "1500,50"). */
 function montantFcfaNonNegatif() {
   return z.preprocess((val) => {
