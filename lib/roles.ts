@@ -41,3 +41,14 @@ export function canCreateStaffRole(
 export function getCreatableStaffRoles(creatorRole: string | null | undefined): StaffAccountRole[] {
   return STAFF_ACCOUNT_ROLES.filter((r) => canCreateStaffRole(creatorRole, r));
 }
+
+/** Liste et consultation des comptes (GET /users). */
+export function canViewAdminUsers(role?: string | null): boolean {
+  const normalized = normalizeAppRole(role);
+  return normalized === "admin" || normalized === "rh";
+}
+
+/** Activation, désactivation et changement de rôle (PUT /users/:id). */
+export function canManageAdminUsers(role?: string | null): boolean {
+  return normalizeAppRole(role) === "admin";
+}
