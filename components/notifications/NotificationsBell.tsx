@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, CheckCheck, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
+import NotificationFilters from "@/components/notifications/NotificationFilters";
 import NotificationList, { NotificationListLink } from "@/components/notifications/NotificationList";
+import { useNotificationFilters } from "@/hooks/useNotificationFilters";
 import { useNotificationsFeed } from "@/hooks/useNotifications";
 import { cn, getUserErrorMessage } from "@/lib/utils";
 
@@ -24,8 +26,16 @@ export default function NotificationsBell({
 
   const { notifications, unreadCount, isLoading, markAsRead, markAllAsRead } =
     useNotificationsFeed();
+  const {
+    filters,
+    filtered,
+    counts,
+    updateFilters,
+    resetFilters,
+    hasActiveFilters,
+  } = useNotificationFilters(notifications);
 
-  const preview = notifications.slice(0, 8);
+  const preview = filtered.slice(0, 8);
   const hasUnread = unreadCount > 0;
 
   useEffect(() => {
@@ -131,6 +141,19 @@ export default function NotificationsBell({
               </div>
             </div>
 
+            {!isLoading && notifications.length > 0 ? (
+              <div className="border-b border-slate-100 px-2 py-2">
+                <NotificationFilters
+                  filters={filters}
+                  counts={counts}
+                  onChange={updateFilters}
+                  onReset={resetFilters}
+                  hasActiveFilters={hasActiveFilters}
+                  compact
+                />
+              </div>
+            ) : null}
+
             <div className="max-h-[min(52dvh,420px)] overflow-y-auto">
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
@@ -142,6 +165,11 @@ export default function NotificationsBell({
                   context={context}
                   onMarkRead={markAsRead}
                   compact
+                  emptyMessage={
+                    notifications.length === 0
+                      ? "Aucune notification pour le moment."
+                      : "Aucune notification pour ces filtres."
+                  }
                 />
               )}
             </div>
