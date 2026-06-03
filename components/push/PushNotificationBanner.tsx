@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, X } from "lucide-react";
 import { dismissPushBanner } from "@/lib/push-notifications";
 import { cn } from "@/lib/utils";
+
+const ACTIVATION_SAFETY_MS = 24_000;
 
 type PushNotificationBannerProps = {
   onSubscribe: () => Promise<boolean>;
@@ -19,21 +21,52 @@ export default function PushNotificationBanner({
   className,
 }: PushNotificationBannerProps) {
   const [activating, setActivating] = useState(false);
+  const [failedOnce, setFailedOnce] = useState(false);
+  const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearSafetyTimer = () => {
+    if (safetyTimerRef.current) {
+      clearTimeout(safetyTimerRef.current);
+      safetyTimerRef.current = null;
+    }
+  };
+
+  useEffect(() => () => clearSafetyTimer(), []);
 
   const handleDismiss = () => {
+    clearSafetyTimer();
+    setActivating(false);
     dismissPushBanner();
     onDismiss?.();
   };
 
   const handleSubscribe = async () => {
     if (activating) return;
+
     setActivating(true);
+    setFailedOnce(false);
+    clearSafetyTimer();
+    safetyTimerRef.current = setTimeout(() => {
+      setActivating(false);
+      setFailedOnce(true);
+    }, ACTIVATION_SAFETY_MS);
+
     try {
-      await onSubscribe();
+      const ok = await onSubscribe();
+      if (!ok) setFailedOnce(true);
+    } catch {
+      setFailedOnce(true);
     } finally {
+      clearSafetyTimer();
       setActivating(false);
     }
   };
+
+  const buttonLabel = activating
+    ? "Activation…"
+    : failedOnce
+      ? "Réessayer"
+      : "Activer les notifications";
 
   return (
     <div
@@ -65,16 +98,15 @@ export default function PushNotificationBanner({
               type="button"
               onClick={() => void handleSubscribe()}
               disabled={activating}
-              className="inline-flex flex-1 items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#1F3F73] transition hover:bg-white/90 disabled:opacity-60 sm:flex-none"
+              className="inline-flex min-w-[10.5rem] flex-1 items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#1F3F73] transition hover:bg-white/90 disabled:opacity-70 sm:flex-none"
             >
-              {activating ? "Activation…" : "Activer les notifications"}
+              {buttonLabel}
             </button>
           ) : null}
           <button
             type="button"
             onClick={handleDismiss}
-            disabled={activating}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white disabled:opacity-50"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
             aria-label="Ignorer"
           >
             <X className="h-4 w-4" />

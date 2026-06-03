@@ -6,6 +6,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { PwaInstallProvider } from "@/context/PwaInstallContext";
 import SessionKeeper from "@/components/auth/SessionKeeper";
 import PushNotificationsRoot from "@/components/push/PushNotificationsRoot";
+import { PushNotificationsProvider } from "@/hooks/usePushNotifications";
 import ChunkLoadRecovery from "@/components/pwa/ChunkLoadRecovery";
 import PwaInstallPrompt from "@/components/pwa/PwaInstallPrompt";
 import { SwrOfflineConfig } from "@/components/pwa/SwrOfflineConfig";
@@ -80,15 +81,17 @@ export default function RootLayout({
         <OfflineBanner />
         <PwaInstallProvider>
           <AuthProvider>
-            <SwrOfflineConfig>
-              <SyncOnReconnect />
-              <SessionKeeper />
-              <TitlebarLayoutShell>
-                <ChunkLoadRecovery />
-                <PushNotificationsRoot />
-                {children}
-              </TitlebarLayoutShell>
-            </SwrOfflineConfig>
+            <PushNotificationsProvider>
+              <SwrOfflineConfig>
+                <SyncOnReconnect />
+                <SessionKeeper />
+                <TitlebarLayoutShell>
+                  <ChunkLoadRecovery />
+                  <PushNotificationsRoot />
+                  {children}
+                </TitlebarLayoutShell>
+              </SwrOfflineConfig>
+            </PushNotificationsProvider>
           </AuthProvider>
           <PwaInstallPrompt />
           <Toaster

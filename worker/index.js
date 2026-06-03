@@ -107,6 +107,20 @@ self.addEventListener("notificationclick", (event) => {
         includeUncontrolled: true,
       });
 
+      // Cherche un onglet qui correspond déjà à l'URL cible
+      for (const client of allClients) {
+        const clientUrl = new URL(client.url);
+        const target = new URL(targetHref, self.location.origin);
+        if (clientUrl.pathname === target.pathname && "focus" in client) {
+          await client.focus();
+          if ("navigate" in client) {
+            await client.navigate(target.href);
+          }
+          return;
+        }
+      }
+
+      // Sinon : focus sur n'importe quel onglet ouvert et navigue
       for (const client of allClients) {
         if ("focus" in client) {
           await client.focus();
@@ -117,6 +131,7 @@ self.addEventListener("notificationclick", (event) => {
         }
       }
 
+      // Sinon : ouvre un nouvel onglet
       if (self.clients.openWindow) {
         await self.clients.openWindow(targetHref);
       }

@@ -116,7 +116,7 @@ export async function ensureWebPushSubscription(
 
   let permission = Notification.permission;
   if (permission === "default" && requestPermission) {
-    permission = await Notification.requestPermission();
+    permission = await requestNotificationPermission();
   }
 
   if (permission === "denied") {
@@ -135,7 +135,8 @@ export async function ensureWebPushSubscription(
     };
   }
 
-  const registration = await waitForServiceWorkerRegistration(10_000);
+  const swWaitMs = process.env.NODE_ENV === "development" ? 5_000 : 10_000;
+  const registration = await waitForServiceWorkerRegistration(swWaitMs);
   if (!registration?.active) {
     const devHint =
       process.env.NODE_ENV === "development"
@@ -154,7 +155,7 @@ export async function ensureWebPushSubscription(
     if (!subscription) {
       const publicKey = await withPushTimeout(
         resolveVapidPublicKey(),
-        12_000,
+        10_000,
         "Impossible de récupérer la clé VAPID (serveur injoignable ou non configuré)."
       );
       if (!publicKey) {
@@ -162,6 +163,14 @@ export async function ensureWebPushSubscription(
           ok: false,
           reason: "error",
           message: "Notifications push non configurées sur le serveur (clés VAPID).",
+        };
+      }
+      if (!isValidVapidPublicKey(publicKey)) {
+        return {
+          ok: false,
+          reason: "error",
+          message:
+            "Clé VAPID invalide (vérifiez NEXT_PUBLIC_VAPID_PUBLIC_KEY sur Vercel — générez-la avec npx web-push generate-vapid-keys).",
         };
       }
 
@@ -180,6 +189,35 @@ export async function ensureWebPushSubscription(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Échec de l'abonnement push";
     return { ok: false, reason: "error", message };
+  }
+}
+
+/** Clé publique VAPID valide = 65 octets une fois décodée (format web-push). */
+export function isValidVapidPublicKey(key: string): boolean {
+  const trimmed = key?.trim();
+  if (!trimmed || trimmed.length < 80) return false;
+  try {
+    return urlBase64ToUint8Array(trimmed).length === 65;
+  } catch {
+    return false;
+  }
+}
+
+async function requestNotificationPermission(timeoutMs = 90_000): Promise<NotificationPermission> {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    return "denied";
+  }
+  if (Notification.permission !== "default") {
+    return Notification.permission;
+  }
+  try {
+    return await withPushTimeout(
+      Notification.requestPermission(),
+      timeoutMs,
+      "permission-timeout"
+    );
+  } catch {
+    return Notification.permission;
   }
 }
 
