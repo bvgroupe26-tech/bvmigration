@@ -52,13 +52,17 @@ async function fetchVapidPublicKey() {
 }
 
 self.addEventListener("push", (event) => {
-  if (!event.data) return;
-
   let payload = {};
-  try {
-    payload = event.data.json();
-  } catch {
-    payload = { body: event.data.text() };
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch {
+      try {
+        payload = { body: event.data.text() };
+      } catch {
+        payload = {};
+      }
+    }
   }
 
   const data = payload.data || {};
@@ -67,7 +71,7 @@ self.addEventListener("push", (event) => {
   const icon = payload.icon || data.icon || DEFAULT_ICON;
   const badge = payload.badge || data.badge || DEFAULT_BADGE;
   const tag = payload.tag || data.tag || "bv-groupe-rh";
-  const url = data.url || payload.url || "/";
+  const url = data.url || payload.url || "/notifications";
 
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -85,7 +89,8 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const targetUrl = event.notification.data?.url || "/";
+  const rawUrl = event.notification.data?.url || "/notifications";
+  const targetHref = new URL(rawUrl, self.location.origin).href;
 
   event.waitUntil(
     (async () => {
@@ -96,20 +101,16 @@ self.addEventListener("notificationclick", (event) => {
 
       for (const client of allClients) {
         if ("focus" in client) {
-          const clientUrl = new URL(client.url);
-          const target = new URL(targetUrl, self.location.origin);
-          if (clientUrl.pathname === target.pathname) {
-            await client.focus();
-            if ("navigate" in client) {
-              await client.navigate(target.href);
-            }
-            return;
+          await client.focus();
+          if ("navigate" in client) {
+            await client.navigate(targetHref);
           }
+          return;
         }
       }
 
       if (self.clients.openWindow) {
-        await self.clients.openWindow(targetUrl);
+        await self.clients.openWindow(targetHref);
       }
     })()
   );

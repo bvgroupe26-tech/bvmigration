@@ -9,6 +9,7 @@ import ProfilePhotoEditor from "@/components/profile/ProfilePhotoEditor";
 import { EmployeeError, EmployeeLoading } from "@/components/employee/EmployeeState";
 import { getUserErrorMessage } from "@/lib/utils";
 import { formatDate } from "@/lib/employee/utils";
+import PwaPushSettingsCard from "@/components/pwa/PwaPushSettingsCard";
 
 export default function EmployeeProfileClient() {
   const { employe, isLoading, error, mutate } = useEmployeMe();
@@ -66,6 +67,8 @@ export default function EmployeeProfileClient() {
         <p className="mt-1 text-sm text-slate-500">{employe?.email ?? employe?.matricule}</p>
         <p className="mt-2 text-xs text-slate-500">Appuyez sur l&apos;icône appareil photo pour changer votre photo.</p>
       </section>
+
+      <PwaPushSettingsCard />
 
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-4 py-3">

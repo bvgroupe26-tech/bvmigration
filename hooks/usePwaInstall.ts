@@ -1,59 +1,101 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useLayoutEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import {
+  detectInstallPlatform,
   dismissInstallPrompt,
+  getInstallPlatformLabel,
+  isInAppBrowser,
   isIosDevice,
   isMobileDevice,
   isStandaloneMode,
+  PWA_INSTALLED_EVENT,
   wasInstallDismissedRecently,
   type BeforeInstallPromptEvent,
+  type InstallPlatform,
 } from "@/lib/pwa-install";
 
-export function usePwaInstall() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [visible, setVisible] = useState(false);
-  const [installing, setInstalling] = useState(false);
-  const [isIos, setIsIos] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+const EXCLUDED_PATH_PREFIXES = ["/offline"];
 
-  useEffect(() => {
+function isExcludedRoute(pathname: string): boolean {
+  return EXCLUDED_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
+function readPlatformState() {
+  if (typeof window === "undefined") {
+    return {
+      platform: "desktop" as InstallPlatform,
+      isIos: false,
+      isMobile: false,
+      inAppBrowser: false,
+    };
+  }
+  const platform = detectInstallPlatform();
+  return {
+    platform,
+    isIos: isIosDevice(),
+    isMobile: isMobileDevice(),
+    inAppBrowser: isInAppBrowser(),
+  };
+}
+
+export function usePwaInstall() {
+  const pathname = usePathname() || "";
+  const initial = readPlatformState();
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [platform, setPlatform] = useState<InstallPlatform>(initial.platform);
+  const [isIos, setIsIos] = useState(initial.isIos);
+  const [isMobile, setIsMobile] = useState(initial.isMobile);
+  const [inAppBrowser, setInAppBrowser] = useState(initial.inAppBrowser);
+
+  const canShowRoute = !isExcludedRoute(pathname);
+
+  useLayoutEffect(() => {
     if (typeof window !== "undefined" && (window as Window & { electronAPI?: unknown }).electronAPI) {
       return;
     }
-    if (isStandaloneMode() || wasInstallDismissedRecently()) return;
+    if (!canShowRoute) {
+      setPromptOpen(false);
+      return;
+    }
+    if (isStandaloneMode() || wasInstallDismissedRecently()) {
+      setPromptOpen(false);
+      return;
+    }
 
-    const ios = isIosDevice();
-    const mobile = isMobileDevice();
-    setIsIos(ios);
-    setIsMobile(mobile);
+    const state = readPlatformState();
+    setPlatform(state.platform);
+    setIsIos(state.isIos);
+    setIsMobile(state.isMobile);
+    setInAppBrowser(state.inAppBrowser);
+    setPromptOpen(true);
 
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setVisible(true);
+      setPromptOpen(true);
     };
 
     const onInstalled = () => {
-      setVisible(false);
+      setPromptOpen(false);
       setDeferredPrompt(null);
       dismissInstallPrompt();
+      window.dispatchEvent(new CustomEvent(PWA_INSTALLED_EVENT));
     };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
     window.addEventListener("appinstalled", onInstalled);
 
-    const timer = window.setTimeout(() => {
-      if (isStandaloneMode() || wasInstallDismissedRecently()) return;
-      setVisible(true);
-    }, 3000);
-
     return () => {
-      window.clearTimeout(timer);
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
     };
-  }, []);
+  }, [canShowRoute, pathname]);
 
   const install = useCallback(async () => {
     if (!deferredPrompt) return false;
@@ -62,9 +104,10 @@ export function usePwaInstall() {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
       if (choice.outcome === "accepted") {
-        setVisible(false);
+        setPromptOpen(false);
         setDeferredPrompt(null);
         dismissInstallPrompt();
+        window.dispatchEvent(new CustomEvent(PWA_INSTALLED_EVENT));
         return true;
       }
       return false;
@@ -77,18 +120,30 @@ export function usePwaInstall() {
 
   const dismiss = useCallback(() => {
     dismissInstallPrompt();
-    setVisible(false);
+    setPromptOpen(false);
+  }, []);
+
+  const openPrompt = useCallback(() => {
+    if (isStandaloneMode()) return;
+    setPromptOpen(true);
   }, []);
 
   const canNativeInstall = Boolean(deferredPrompt);
+  const platformLabel = getInstallPlatformLabel(platform);
+  const visible = canShowRoute && promptOpen && !isStandaloneMode();
 
   return {
     visible,
     installing,
+    platform,
+    platformLabel,
     isIos,
     isMobile,
+    inAppBrowser,
     canNativeInstall,
     install,
     dismiss,
+    openPrompt,
+    isStandalone: isStandaloneMode(),
   };
 }

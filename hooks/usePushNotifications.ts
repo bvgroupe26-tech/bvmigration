@@ -1,14 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { canUseWebPush, needsPwaInstallForPush } from "@/lib/push-device";
+import { PWA_INSTALLED_EVENT } from "@/lib/pwa-install";
 import {
   removePushSubscription,
   resolveVapidPublicKey,
   sendPushSubscription,
   urlBase64ToUint8Array,
+  waitForServiceWorkerRegistration,
 } from "@/lib/push-notifications";
-
-const SW_URL = "/sw.js";
 
 function isElectron(): boolean {
   return typeof window !== "undefined" && (window as Window & { electronAPI?: unknown }).electronAPI != null;
@@ -19,14 +20,15 @@ export function usePushNotifications() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [loading, setLoading] = useState(false);
+  const [needsInstallFirst, setNeedsInstallFirst] = useState(false);
 
   const syncSubscriptionState = useCallback(async (registration?: ServiceWorkerRegistration) => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    if (!canUseWebPush()) {
       setIsSubscribed(false);
       return;
     }
 
-    const reg = registration ?? (await navigator.serviceWorker.ready.catch(() => null));
+    const reg = registration ?? (await waitForServiceWorkerRegistration(8_000));
     if (!reg) {
       setIsSubscribed(false);
       return;
@@ -39,36 +41,34 @@ export function usePushNotifications() {
   useEffect(() => {
     if (typeof window === "undefined" || isElectron()) return;
 
-    const supported =
-      "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+    const supported = canUseWebPush();
     setIsSupported(supported);
     setPermission(Notification.permission);
+    setNeedsInstallFirst(needsPwaInstallForPush());
 
     if (!supported) return;
 
     let cancelled = false;
 
-    const registerServiceWorker = async () => {
+    const init = async () => {
       try {
-        const existing = await navigator.serviceWorker.getRegistration("/");
-        const registration =
-          existing ?? (await navigator.serviceWorker.register(SW_URL, { scope: "/" }));
-
+        const registration = await waitForServiceWorkerRegistration();
         if (cancelled) return;
-
-        await navigator.serviceWorker.ready;
-        if (cancelled) return;
-
-        await syncSubscriptionState(registration);
+        await syncSubscriptionState(registration ?? undefined);
       } catch {
         if (!cancelled) setIsSubscribed(false);
       }
     };
 
-    void registerServiceWorker();
+    void init();
 
     const onPermissionChange = () => {
       setPermission(Notification.permission);
+      setNeedsInstallFirst(needsPwaInstallForPush());
+    };
+
+    const onPwaInstalled = () => {
+      setNeedsInstallFirst(needsPwaInstallForPush());
     };
 
     if (navigator.permissions?.query) {
@@ -80,66 +80,32 @@ export function usePushNotifications() {
         .catch(() => undefined);
     }
 
+    window.addEventListener(PWA_INSTALLED_EVENT, onPwaInstalled);
+
     return () => {
       cancelled = true;
+      window.removeEventListener(PWA_INSTALLED_EVENT, onPwaInstalled);
     };
   }, [syncSubscriptionState]);
 
   const subscribe = useCallback(async (): Promise<boolean> => {
     if (!isSupported || loading) return false;
 
+    if (needsPwaInstallForPush()) {
+      return false;
+    }
+
     setLoading(true);
-    // #region agent log
-    fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-      body: JSON.stringify({
-        sessionId: "cd157f",
-        runId: "pre-fix",
-        hypothesisId: "H1-H5",
-        location: "usePushNotifications.ts:subscribe:start",
-        message: "subscribe started",
-        data: { isSupported, sw: "serviceWorker" in navigator },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     try {
       const result = await Notification.requestPermission();
       setPermission(result);
-      // #region agent log
-      fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-        body: JSON.stringify({
-          sessionId: "cd157f",
-          runId: "pre-fix",
-          hypothesisId: "H5",
-          location: "usePushNotifications.ts:subscribe:afterPermission",
-          message: "permission result",
-          data: { result },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       if (result !== "granted") return false;
 
-      const registration = await navigator.serviceWorker.ready;
-      // #region agent log
-      fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-        body: JSON.stringify({
-          sessionId: "cd157f",
-          runId: "pre-fix",
-          hypothesisId: "H1",
-          location: "usePushNotifications.ts:subscribe:afterSwReady",
-          message: "service worker ready",
-          data: { scope: registration.scope },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
+      const registration = await waitForServiceWorkerRegistration();
+      if (!registration?.active) {
+        throw new Error("Service worker indisponible. Rechargez la page ou installez l'application.");
+      }
+
       const existing = await registration.pushManager.getSubscription();
 
       if (existing) {
@@ -149,21 +115,6 @@ export function usePushNotifications() {
       }
 
       const publicKey = await resolveVapidPublicKey();
-      // #region agent log
-      fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-        body: JSON.stringify({
-          sessionId: "cd157f",
-          runId: "pre-fix",
-          hypothesisId: "H2",
-          location: "usePushNotifications.ts:subscribe:afterVapid",
-          message: "vapid key resolved",
-          data: { hasKey: Boolean(publicKey), keyLen: publicKey?.length ?? 0 },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       if (!publicKey) throw new Error("Clé VAPID publique introuvable");
 
       const subscription = await registration.pushManager.subscribe({
@@ -172,57 +123,12 @@ export function usePushNotifications() {
       });
 
       await sendPushSubscription(subscription);
-      // #region agent log
-      fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-        body: JSON.stringify({
-          sessionId: "cd157f",
-          runId: "pre-fix",
-          hypothesisId: "H3",
-          location: "usePushNotifications.ts:subscribe:afterSend",
-          message: "subscription sent to API",
-          data: { ok: true },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       setIsSubscribed(true);
       return true;
-    } catch (err) {
-      // #region agent log
-      fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-        body: JSON.stringify({
-          sessionId: "cd157f",
-          runId: "pre-fix",
-          hypothesisId: "H1-H3",
-          location: "usePushNotifications.ts:subscribe:catch",
-          message: "subscribe failed",
-          data: { error: err instanceof Error ? err.message : "unknown" },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
+    } catch {
       setIsSubscribed(false);
       return false;
     } finally {
-      // #region agent log
-      fetch("http://127.0.0.1:7884/ingest/82698950-066a-4e8e-9d55-0959df3d765c", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "cd157f" },
-        body: JSON.stringify({
-          sessionId: "cd157f",
-          runId: "pre-fix",
-          hypothesisId: "H4",
-          location: "usePushNotifications.ts:subscribe:finally",
-          message: "subscribe finished",
-          data: {},
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       setLoading(false);
     }
   }, [isSupported, loading]);
@@ -232,7 +138,12 @@ export function usePushNotifications() {
 
     setLoading(true);
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await waitForServiceWorkerRegistration();
+      if (!registration) {
+        setIsSubscribed(false);
+        return true;
+      }
+
       const subscription = await registration.pushManager.getSubscription();
       if (!subscription) {
         setIsSubscribed(false);
@@ -256,7 +167,9 @@ export function usePushNotifications() {
     isSubscribed,
     permission,
     loading,
+    needsInstallFirst,
     subscribe,
     unsubscribe,
+    syncSubscriptionState,
   };
 }

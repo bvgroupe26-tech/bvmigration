@@ -1,0 +1,95 @@
+"use client";
+
+import { Bell, Download, Smartphone } from "lucide-react";
+import { toast } from "sonner";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
+import GlassCard from "@/components/ui/GlassCard";
+
+export default function PwaPushSettingsCard() {
+  const { openPrompt, isStandalone, canNativeInstall, install, installing } = usePwaInstall();
+  const {
+    isSupported,
+    isSubscribed,
+    permission,
+    loading,
+    needsInstallFirst,
+    subscribe,
+  } = usePushNotifications();
+
+  if (!isSupported) {
+    return (
+      <GlassCard className="p-4">
+        <p className="text-sm text-slate-600">
+          Les notifications push ne sont pas prises en charge par ce navigateur.
+        </p>
+      </GlassCard>
+    );
+  }
+
+  async function handleEnablePush() {
+    const ok = await subscribe();
+    if (ok) toast.success("Notifications activées");
+    else if (needsInstallFirst) toast.message("Installez d'abord l'application sur l'écran d'accueil.");
+    else if (permission === "denied")
+      toast.error("Autorisez les notifications dans les paramètres du navigateur.");
+    else toast.error("Impossible d'activer les notifications. Réessayez.");
+  }
+
+  return (
+    <GlassCard className="space-y-4 p-4">
+      <div className="flex items-start gap-3">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1F3F73]/10 text-[#1F3F73]">
+          <Bell className="h-5 w-5" />
+        </span>
+        <div>
+          <h3 className="font-semibold text-slate-900">Application & notifications</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            {isSubscribed
+              ? "Vous recevrez les alertes RH même lorsque l'application est fermée."
+              : "Installez l'app et activez les notifications pour ne rien manquer."}
+          </p>
+        </div>
+      </div>
+
+      {!isStandalone ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (canNativeInstall) void install();
+            else openPrompt();
+          }}
+          disabled={installing}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#1F3F73] transition hover:bg-slate-50 disabled:opacity-60"
+        >
+          {canNativeInstall ? (
+            <Download className="h-4 w-4" />
+          ) : (
+            <Smartphone className="h-4 w-4" />
+          )}
+          {installing ? "Installation…" : "Installer l'application"}
+        </button>
+      ) : null}
+
+      {!isSubscribed ? (
+        <button
+          type="button"
+          onClick={() => void handleEnablePush()}
+          disabled={loading || needsInstallFirst}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2F5F9D] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1F3F73] disabled:opacity-60"
+        >
+          <Bell className="h-4 w-4" />
+          {loading ? "Activation…" : "Activer les notifications"}
+        </button>
+      ) : (
+        <p className="text-center text-xs font-medium text-green-700">Notifications activées</p>
+      )}
+
+      {needsInstallFirst ? (
+        <p className="text-xs text-amber-800">
+          Sur iPhone : installez l&apos;app via Partager → Sur l&apos;écran d&apos;accueil, puis revenez ici.
+        </p>
+      ) : null}
+    </GlassCard>
+  );
+}

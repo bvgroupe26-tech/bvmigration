@@ -3,14 +3,52 @@ import { apiFetch } from "@/lib/apiClient";
 const VAPID_ENV_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
 export const PUSH_BANNER_DISMISS_KEY = "bv-push-banner-dismissed";
+const PUSH_DISMISS_DAYS = 14;
 
 export function wasPushBannerDismissed(): boolean {
   if (typeof window === "undefined") return false;
-  return localStorage.getItem(PUSH_BANNER_DISMISS_KEY) === "1";
+  try {
+    const raw = localStorage.getItem(PUSH_BANNER_DISMISS_KEY);
+    if (!raw) return false;
+    if (raw === "1") return true;
+    const dismissedAt = Number(raw);
+    if (!Number.isFinite(dismissedAt)) return false;
+    return Date.now() - dismissedAt < PUSH_DISMISS_DAYS * 24 * 60 * 60 * 1000;
+  } catch {
+    return false;
+  }
 }
 
 export function dismissPushBanner(): void {
-  localStorage.setItem(PUSH_BANNER_DISMISS_KEY, "1");
+  localStorage.setItem(PUSH_BANNER_DISMISS_KEY, String(Date.now()));
+}
+
+/** Attend le SW next-pwa (ne pas enregistrer un second /sw.js). */
+export async function waitForServiceWorkerRegistration(
+  maxWaitMs = 20_000
+): Promise<ServiceWorkerRegistration | null> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+    return null;
+  }
+
+  const deadline = Date.now() + maxWaitMs;
+
+  while (Date.now() < deadline) {
+    const reg = await navigator.serviceWorker.getRegistration("/");
+    if (reg?.active) return reg;
+
+    try {
+      await navigator.serviceWorker.ready;
+      const ready = await navigator.serviceWorker.getRegistration("/");
+      if (ready?.active) return ready;
+    } catch {
+      /* next-pwa pas encore prêt */
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+
+  return (await navigator.serviceWorker.getRegistration("/")) ?? null;
 }
 
 export function urlBase64ToUint8Array(base64String: string): Uint8Array {

@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "BV Groupe — Gestion RH",
     short_name: "BV Groupe RH",
     description: "Application RH BV Groupe : employés, paie, présences, congés.",

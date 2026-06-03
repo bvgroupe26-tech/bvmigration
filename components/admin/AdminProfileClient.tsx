@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import ProfilePhotoEditor from "@/components/profile/ProfilePhotoEditor";
 import GlassCard from "@/components/ui/GlassCard";
+import PwaPushSettingsCard from "@/components/pwa/PwaPushSettingsCard";
 import { getUserErrorMessage } from "@/lib/utils";
 import { normalizeAppRole } from "@/lib/session";
 
@@ -74,6 +75,8 @@ export default function AdminProfileClient() {
           <p className="mt-2 text-xs text-slate-500">Appuyez sur l&apos;icône appareil photo pour changer votre photo.</p>
         )}
       </section>
+
+      <PwaPushSettingsCard />
 
       <GlassCard className="overflow-hidden p-0">
         <div className="border-b border-slate-100 px-5 py-3">

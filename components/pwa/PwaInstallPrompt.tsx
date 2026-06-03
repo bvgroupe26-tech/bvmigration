@@ -1,14 +1,25 @@
 "use client";
 
 import Image from "next/image";
-import { Download, Share, Smartphone, X } from "lucide-react";
+import { Download, MoreVertical, Share, Smartphone, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { cn } from "@/lib/utils";
 
 export default function PwaInstallPrompt() {
-  const { visible, installing, isIos, isMobile, canNativeInstall, install, dismiss } = usePwaInstall();
+  const {
+    visible,
+    installing,
+    platform,
+    platformLabel,
+    isIos,
+    isMobile,
+    inAppBrowser,
+    canNativeInstall,
+    install,
+    dismiss,
+  } = usePwaInstall();
   const pathname = usePathname() || "";
   const hasBottomNav =
     pathname.startsWith("/employee") ||
@@ -73,14 +84,12 @@ export default function PwaInstallPrompt() {
                   </div>
                   <div className="min-w-0 pr-8">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">
-                      BV Groupe
+                      BV Groupe RH
                     </p>
                     <h2 id="pwa-install-title" className="font-display text-lg font-bold leading-tight">
                       Installer l&apos;application
                     </h2>
-                    <p className="mt-1 text-xs text-white/75">
-                      Accès rapide depuis votre {isMobile ? "téléphone" : "ordinateur"}
-                    </p>
+                    <p className="mt-1 text-xs font-medium text-white/90">{platformLabel}</p>
                   </div>
                 </div>
               </div>
@@ -88,10 +97,19 @@ export default function PwaInstallPrompt() {
               <div className="space-y-4 px-5 py-4">
                 <p id="pwa-install-desc" className="text-sm leading-relaxed text-slate-600">
                   Installez <strong className="text-slate-900">BV Groupe RH</strong> sur votre appareil pour un
-                  accès direct, une icône sur l&apos;écran d&apos;accueil et une expérience plein écran.
+                  accès direct, une icône sur l&apos;écran d&apos;accueil
+                  {isIos ? " et les notifications en arrière-plan" : " et une expérience plein écran"}.
                 </p>
 
-                {isIos && !canNativeInstall ? (
+                {inAppBrowser ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+                    <p className="font-medium">Ouvrez dans Safari ou Chrome</p>
+                    <p className="mt-1">
+                      L&apos;installation n&apos;est pas disponible depuis cette application (Facebook, Instagram…).
+                      Utilisez le menu <strong>Ouvrir dans le navigateur</strong>.
+                    </p>
+                  </div>
+                ) : platform === "ios" && !canNativeInstall ? (
                   <ol className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
                     <li className="flex items-start gap-2">
                       <Share className="mt-0.5 h-4 w-4 shrink-0 text-[#2F5F9D]" />
@@ -119,6 +137,28 @@ export default function PwaInstallPrompt() {
                       </span>
                     </li>
                   </ol>
+                ) : platform === "android" && !canNativeInstall ? (
+                  <ol className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                    <li className="flex items-start gap-2">
+                      <MoreVertical className="mt-0.5 h-4 w-4 shrink-0 text-[#2F5F9D]" />
+                      <span>
+                        Appuyez sur le menu <strong>⋮</strong> en haut à droite de Chrome
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Download className="mt-0.5 h-4 w-4 shrink-0 text-[#2F5F9D]" />
+                      <span>
+                        Choisissez <strong>Installer l&apos;application</strong> ou{" "}
+                        <strong>Ajouter à l&apos;écran d&apos;accueil</strong>
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-[#2F5F9D]" />
+                      <span>
+                        Validez — l&apos;icône <strong>BV Groupe RH</strong> sera sur votre écran d&apos;accueil
+                      </span>
+                    </li>
+                  </ol>
                 ) : canNativeInstall ? (
                   <button
                     type="button"
@@ -129,15 +169,22 @@ export default function PwaInstallPrompt() {
                     <Download className="h-4 w-4" />
                     {installing ? "Installation…" : "Installer maintenant"}
                   </button>
-                ) : (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                    <p className="font-medium text-slate-800">Sur ordinateur (Chrome / Edge)</p>
-                    <p className="mt-1">
-                      Cliquez sur l&apos;icône <strong>Installer</strong> dans la barre d&apos;adresse, ou via le
-                      menu ⋮ → <strong>Installer l&apos;application</strong>.
-                    </p>
-                  </div>
-                )}
+                ) : platform === "desktop" ? (
+                  <ol className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                    <li className="flex items-start gap-2">
+                      <Download className="mt-0.5 h-4 w-4 shrink-0 text-[#2F5F9D]" />
+                      <span>
+                        Cliquez sur l&apos;icône <strong>Installer</strong> dans la barre d&apos;adresse (Chrome / Edge)
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <MoreVertical className="mt-0.5 h-4 w-4 shrink-0 text-[#2F5F9D]" />
+                      <span>
+                        Ou menu <strong>⋮</strong> → <strong>Installer l&apos;application BV Groupe RH</strong>
+                      </span>
+                    </li>
+                  </ol>
+                ) : null}
 
                 <button
                   type="button"
