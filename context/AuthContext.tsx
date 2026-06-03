@@ -23,6 +23,7 @@ import {
   persistLastRoute,
   readCachedProfile as readStoredProfile,
 } from "@/lib/session-storage";
+import { BV_AUTH_READY_EVENT } from "@/lib/pwa-install";
 
 const PUBLIC_PATHS = new Set(["/", "/login"]);
 const AUTH_FETCH_TIMEOUT_MS = 20_000;
@@ -238,6 +239,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthenticated(true);
     setIsReconnecting(false);
     setSuppressLoginRedirect(false);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(BV_AUTH_READY_EVENT));
+    }
   }, []);
 
   const clearUser = useCallback(() => {

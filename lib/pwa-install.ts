@@ -61,6 +61,9 @@ export function isInAppBrowser(): boolean {
 
 export const PWA_INSTALLED_EVENT = "bv-pwa-installed";
 
+/** Émis après connexion ou bootstrap auth réussi — déclenche l’abonnement push. */
+export const BV_AUTH_READY_EVENT = "bv-auth-ready";
+
 export function wasInstallDismissedRecently(): boolean {
   if (typeof localStorage === "undefined") return false;
   try {

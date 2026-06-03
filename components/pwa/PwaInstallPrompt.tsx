@@ -21,6 +21,7 @@ export default function PwaInstallPrompt() {
     dismiss,
   } = usePwaInstall();
   const pathname = usePathname() || "";
+  const isLoginPage = pathname === "/login";
   const hasBottomNav =
     pathname.startsWith("/employee") ||
     (pathname.startsWith("/dashboard") ||
@@ -57,7 +58,9 @@ export default function PwaInstallPrompt() {
               "fixed inset-x-4 z-[9999] mx-auto max-w-md no-print sm:inset-x-auto sm:right-8 sm:left-auto",
               hasBottomNav
                 ? "bottom-[calc(var(--shell-bottom-nav-height)+env(safe-area-inset-bottom,0px)+1rem)] lg:bottom-8"
-                : "bottom-4 sm:bottom-8"
+                : isLoginPage
+                  ? "bottom-4 max-h-[min(70dvh,520px)] overflow-y-auto sm:bottom-6"
+                  : "bottom-4 sm:bottom-8"
             )}
           >
             <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl shadow-slate-900/15">

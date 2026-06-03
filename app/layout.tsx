@@ -3,6 +3,7 @@ import { Syne, JetBrains_Mono, DM_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { TitlebarLayoutShell } from "@/components/Titlebar";
 import { AuthProvider } from "@/context/AuthContext";
+import { PwaInstallProvider } from "@/context/PwaInstallContext";
 import SessionKeeper from "@/components/auth/SessionKeeper";
 import PushNotificationsRoot from "@/components/push/PushNotificationsRoot";
 import ChunkLoadRecovery from "@/components/pwa/ChunkLoadRecovery";
@@ -77,16 +78,20 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <OfflineBanner />
-        <AuthProvider>
-          <SwrOfflineConfig>
-          <SyncOnReconnect />
-          <SessionKeeper />
-          <TitlebarLayoutShell>
-            <ChunkLoadRecovery />
-            <PushNotificationsRoot />
-            {children}
-            <PwaInstallPrompt />
-            <Toaster
+        <PwaInstallProvider>
+          <AuthProvider>
+            <SwrOfflineConfig>
+              <SyncOnReconnect />
+              <SessionKeeper />
+              <TitlebarLayoutShell>
+                <ChunkLoadRecovery />
+                <PushNotificationsRoot />
+                {children}
+              </TitlebarLayoutShell>
+            </SwrOfflineConfig>
+          </AuthProvider>
+          <PwaInstallPrompt />
+          <Toaster
             theme="light"
             position="top-right"
             richColors
@@ -100,9 +105,7 @@ export default function RootLayout({
               className: "font-sans",
             }}
           />
-        </TitlebarLayoutShell>
-          </SwrOfflineConfig>
-        </AuthProvider>
+        </PwaInstallProvider>
       </body>
     </html>
   );

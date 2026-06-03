@@ -2,6 +2,13 @@
 
 const DEFAULT_ICON = "/icons/icon-192.png";
 const DEFAULT_BADGE = "/icons/icon-192.png";
+
+function assetUrl(path) {
+  if (!path || path.startsWith("http://") || path.startsWith("https://")) {
+    return path || assetUrl(DEFAULT_ICON);
+  }
+  return new URL(path, self.location.origin).href;
+}
 const VAPID_KEY_URL = "/api/nest/push/vapid-public-key";
 const SUBSCRIBE_URL = "/api/nest/push/subscribe";
 
@@ -68,8 +75,8 @@ self.addEventListener("push", (event) => {
   const data = payload.data || {};
   const title = payload.title || "BV Groupe RH";
   const body = payload.body || "Nouvelle notification";
-  const icon = payload.icon || data.icon || DEFAULT_ICON;
-  const badge = payload.badge || data.badge || DEFAULT_BADGE;
+  const icon = assetUrl(payload.icon || data.icon || DEFAULT_ICON);
+  const badge = assetUrl(payload.badge || data.badge || DEFAULT_BADGE);
   const tag = payload.tag || data.tag || "bv-groupe-rh";
   const url = data.url || payload.url || "/notifications";
 
@@ -80,6 +87,7 @@ self.addEventListener("push", (event) => {
       badge,
       tag,
       renotify: true,
+      requireInteraction: false,
       vibrate: [200, 100, 200],
       data: { url, ...data },
     })

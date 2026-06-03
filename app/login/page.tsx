@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Image from "next/image";
 import LoginForm from "@/components/auth/LoginForm";
+import LoginPwaInstallHint from "@/components/pwa/LoginPwaInstallHint";
 import LoginCardEntrance from "./LoginCardEntrance";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,8 @@ export default function LoginPage() {
           </h1>
           <p className="mt-1 text-sm text-slate-600">Espace RH — Connexion</p>
         </div>
+
+        <LoginPwaInstallHint />
 
         <LoginCardEntrance>
           <div className="w-full rounded-2xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5">

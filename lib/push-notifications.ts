@@ -24,31 +24,163 @@ export function dismissPushBanner(): void {
 }
 
 /** Attend le SW next-pwa (ne pas enregistrer un second /sw.js). */
+const SW_URL = "/sw.js";
+
+function raceTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), ms);
+    }),
+  ]);
+}
+
+export async function withPushTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  message: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 export async function waitForServiceWorkerRegistration(
-  maxWaitMs = 20_000
+  maxWaitMs = 12_000
 ): Promise<ServiceWorkerRegistration | null> {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return null;
   }
 
   const deadline = Date.now() + maxWaitMs;
+  const perWaitMs = Math.min(2_500, maxWaitMs);
 
   while (Date.now() < deadline) {
-    const reg = await navigator.serviceWorker.getRegistration("/");
+    let reg = await navigator.serviceWorker.getRegistration("/");
     if (reg?.active) return reg;
 
-    try {
-      await navigator.serviceWorker.ready;
-      const ready = await navigator.serviceWorker.getRegistration("/");
-      if (ready?.active) return ready;
-    } catch {
-      /* next-pwa pas encore prêt */
+    if (!reg && Date.now() > deadline - maxWaitMs + 3_000) {
+      try {
+        reg = await navigator.serviceWorker.register(SW_URL, { scope: "/" });
+        await raceTimeout(navigator.serviceWorker.ready, perWaitMs);
+        reg = await navigator.serviceWorker.getRegistration("/");
+        if (reg?.active) return reg;
+      } catch {
+        /* next-pwa peut prendre le relais */
+      }
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await raceTimeout(navigator.serviceWorker.ready, perWaitMs);
+    reg = await navigator.serviceWorker.getRegistration("/");
+    if (reg?.active) return reg;
+
+    await new Promise((resolve) => setTimeout(resolve, 350));
   }
 
-  return (await navigator.serviceWorker.getRegistration("/")) ?? null;
+  const last = await navigator.serviceWorker.getRegistration("/");
+  return last?.active ? last : null;
+}
+
+export type EnsurePushResult =
+  | { ok: true; subscribed: boolean }
+  | { ok: false; reason: "unsupported" | "denied" | "needs_install" | "error"; message: string };
+
+/** Demande la permission, abonne au push et enregistre sur le serveur. */
+export async function ensureWebPushSubscription(
+  requestPermission = false
+): Promise<EnsurePushResult> {
+  if (typeof window === "undefined") {
+    return { ok: false, reason: "unsupported", message: "Environnement non supporté" };
+  }
+
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+    return { ok: false, reason: "unsupported", message: "Navigateur incompatible avec les notifications push" };
+  }
+
+  const { needsPwaInstallForPush } = await import("@/lib/push-device");
+  if (needsPwaInstallForPush()) {
+    return {
+      ok: false,
+      reason: "needs_install",
+      message: "Sur iPhone, installez l'application sur l'écran d'accueil pour recevoir les alertes.",
+    };
+  }
+
+  let permission = Notification.permission;
+  if (permission === "default" && requestPermission) {
+    permission = await Notification.requestPermission();
+  }
+
+  if (permission === "denied") {
+    return {
+      ok: false,
+      reason: "denied",
+      message: "Notifications bloquées — autorisez-les dans les paramètres du navigateur.",
+    };
+  }
+
+  if (permission !== "granted") {
+    return {
+      ok: false,
+      reason: "denied",
+      message: "Autorisation des notifications requise.",
+    };
+  }
+
+  const registration = await waitForServiceWorkerRegistration(10_000);
+  if (!registration?.active) {
+    const devHint =
+      process.env.NODE_ENV === "development"
+        ? " En mode développement, testez avec « npm run build && npm run start » ou sur l'URL de production."
+        : "";
+    return {
+      ok: false,
+      reason: "error",
+      message: `Service worker indisponible. Rechargez la page ou installez l'application.${devHint}`,
+    };
+  }
+
+  try {
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      const publicKey = await withPushTimeout(
+        resolveVapidPublicKey(),
+        12_000,
+        "Impossible de récupérer la clé VAPID (serveur injoignable ou non configuré)."
+      );
+      if (!publicKey) {
+        return {
+          ok: false,
+          reason: "error",
+          message: "Notifications push non configurées sur le serveur (clés VAPID).",
+        };
+      }
+
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
+      });
+    }
+
+    await withPushTimeout(
+      sendPushSubscription(subscription),
+      15_000,
+      "Enregistrement sur le serveur trop long — vérifiez la connexion et réessayez."
+    );
+    return { ok: true, subscribed: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Échec de l'abonnement push";
+    return { ok: false, reason: "error", message };
+  }
 }
 
 export function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -98,7 +230,7 @@ export async function resolveVapidPublicKey(): Promise<string> {
 
   const result = await apiFetch<VapidKeyResponse | string>("/push/vapid-public-key");
   if (!result.ok) {
-    throw new Error(result.error);
+    throw new Error(result.error || "Clé VAPID indisponible");
   }
 
   const payload = result.data;

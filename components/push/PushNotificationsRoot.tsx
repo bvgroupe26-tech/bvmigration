@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { PWA_INSTALLED_EVENT } from "@/lib/pwa-install";
+import { BV_AUTH_READY_EVENT, PWA_INSTALLED_EVENT } from "@/lib/pwa-install";
 import { wasPushBannerDismissed } from "@/lib/push-notifications";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import PushNotificationBanner from "@/components/push/PushNotificationBanner";
@@ -17,12 +17,21 @@ export default function PushNotificationsRoot() {
     isSupported,
     isSubscribed,
     permission,
-    loading,
     needsInstallFirst,
     subscribe,
     syncSubscriptionState,
   } = usePushNotifications();
   const [bannerDismissed, setBannerDismissed] = useState(true);
+  const autoSubscribeDoneRef = useRef(false);
+  const lastSilentRetryRef = useRef(0);
+
+  const runSilentSubscribe = useCallback(async () => {
+    if (needsInstallFirst || permission !== "granted") return;
+    const now = Date.now();
+    if (now - lastSilentRetryRef.current < 30_000) return;
+    lastSilentRetryRef.current = now;
+    await subscribe({ silent: true, requestPermission: false });
+  }, [needsInstallFirst, permission, subscribe]);
 
   useEffect(() => {
     setBannerDismissed(wasPushBannerDismissed());
@@ -30,21 +39,19 @@ export default function PushNotificationsRoot() {
 
   useEffect(() => {
     if (isElectron() || isLoading || !isAuthenticated || !user || !isSupported) return;
-    if (needsInstallFirst) return;
+    if (autoSubscribeDoneRef.current) return;
+    if (permission !== "granted" || needsInstallFirst) return;
 
-    if (permission === "granted" && !isSubscribed && !loading) {
-      void subscribe();
-    }
+    autoSubscribeDoneRef.current = true;
+    void runSilentSubscribe();
   }, [
     user,
     isAuthenticated,
     isSupported,
-    permission,
-    isSubscribed,
-    loading,
     isLoading,
+    permission,
     needsInstallFirst,
-    subscribe,
+    runSilentSubscribe,
   ]);
 
   useEffect(() => {
@@ -53,32 +60,40 @@ export default function PushNotificationsRoot() {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       void syncSubscriptionState();
-      if (Notification.permission === "granted" && !needsInstallFirst) {
-        void subscribe();
+      if (Notification.permission === "granted" && !needsInstallFirst && !isSubscribed) {
+        void runSilentSubscribe();
       }
     };
 
     const onPwaInstalled = () => {
-      void syncSubscriptionState();
-      if (!wasPushBannerDismissed()) {
-        setBannerDismissed(false);
+      setBannerDismissed(false);
+      autoSubscribeDoneRef.current = false;
+      void subscribe({ silent: false, requestPermission: true });
+    };
+
+    const onAuthReady = () => {
+      if (Notification.permission === "granted" && !needsInstallFirst) {
+        void runSilentSubscribe();
       }
-      void subscribe();
     };
 
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
     window.addEventListener(PWA_INSTALLED_EVENT, onPwaInstalled);
+    window.addEventListener(BV_AUTH_READY_EVENT, onAuthReady);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
       window.removeEventListener(PWA_INSTALLED_EVENT, onPwaInstalled);
+      window.removeEventListener(BV_AUTH_READY_EVENT, onAuthReady);
     };
   }, [
     isAuthenticated,
     isSupported,
+    isSubscribed,
     needsInstallFirst,
+    runSilentSubscribe,
     subscribe,
     syncSubscriptionState,
   ]);
@@ -87,7 +102,7 @@ export default function PushNotificationsRoot() {
     return null;
   }
 
-  if (isSubscribed || bannerDismissed) {
+  if (isSubscribed) {
     return null;
   }
 
@@ -95,10 +110,13 @@ export default function PushNotificationsRoot() {
     return null;
   }
 
+  if (bannerDismissed && permission === "granted") {
+    return null;
+  }
+
   const showBanner =
-    permission === "default" ||
-    (permission === "granted" && !isSubscribed) ||
-    needsInstallFirst;
+    !bannerDismissed &&
+    (permission === "default" || (permission === "granted" && !isSubscribed) || needsInstallFirst);
 
   if (!showBanner) {
     return null;
@@ -107,9 +125,12 @@ export default function PushNotificationsRoot() {
   return (
     <div className="no-print fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+2.75rem)] z-[10001] px-3 sm:px-4">
       <PushNotificationBanner
-        onSubscribe={subscribe}
+        onSubscribe={async () => {
+          const ok = await subscribe({ silent: false, requestPermission: true });
+          if (ok) setBannerDismissed(true);
+          return ok;
+        }}
         onDismiss={() => setBannerDismissed(true)}
-        loading={loading}
         needsInstallFirst={needsInstallFirst}
       />
     </div>

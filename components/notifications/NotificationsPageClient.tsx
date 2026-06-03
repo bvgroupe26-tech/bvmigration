@@ -82,17 +82,18 @@ export default function NotificationsPageClient({
         )}
       </div>
 
-      {!listEmpty ? (
-        <NotificationFilters
-          filters={filters}
-          counts={counts}
-          onChange={updateFilters}
-          onReset={resetFilters}
-          hasActiveFilters={hasActiveFilters}
-        />
-      ) : null}
-
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {!listEmpty ? (
+          <div className="border-b border-slate-100 bg-slate-50/60 px-4 py-4 sm:px-5">
+            <NotificationFilters
+              filters={filters}
+              counts={counts}
+              onChange={updateFilters}
+              onReset={resetFilters}
+              hasActiveFilters={hasActiveFilters}
+            />
+          </div>
+        ) : null}
         <NotificationList
           notifications={filtered}
           context={context}

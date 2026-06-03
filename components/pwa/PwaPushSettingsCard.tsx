@@ -28,12 +28,16 @@ export default function PwaPushSettingsCard() {
   }
 
   async function handleEnablePush() {
-    const ok = await subscribe();
-    if (ok) toast.success("Notifications activées");
-    else if (needsInstallFirst) toast.message("Installez d'abord l'application sur l'écran d'accueil.");
-    else if (permission === "denied")
+    const ok = await subscribe({ requestPermission: true });
+    if (ok) return;
+    if (needsInstallFirst) {
+      toast.message("Installez d'abord l'application sur l'écran d'accueil.");
+      return;
+    }
+    if (permission === "denied") {
       toast.error("Autorisez les notifications dans les paramètres du navigateur.");
-    else toast.error("Impossible d'activer les notifications. Réessayez.");
+    }
+    /* autres erreurs : toast déjà affiché par subscribe */
   }
 
   return (
