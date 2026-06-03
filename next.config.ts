@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 
-const OFFLINE_ASSETS_REVISION = "2";
+const OFFLINE_ASSETS_REVISION = "4";
 
 const withPWA = withPWAInit({
   dest: "public",
@@ -10,10 +10,10 @@ const withPWA = withPWAInit({
   sw: "sw.js",
   customWorkerSrc: "worker",
   customWorkerDest: "public",
-  /** Évite de mettre en cache les navigations RSC (souvent en cause sur mobile après déploiement). */
-  cacheOnFrontEndNav: false,
-  aggressiveFrontEndNavCaching: false,
+  cacheOnFrontEndNav: true,
+  aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
+  extendDefaultRuntimeCaching: true,
   fallbacks: {
     document: "/offline",
   },
@@ -30,14 +30,66 @@ const withPWA = withPWAInit({
       /\/.*\.[a-zA-Z0-9]+$/,
     ],
     additionalManifestEntries: [
+      { url: "/", revision: OFFLINE_ASSETS_REVISION },
       { url: "/offline", revision: OFFLINE_ASSETS_REVISION },
       { url: "/login", revision: OFFLINE_ASSETS_REVISION },
       { url: "/dashboard", revision: OFFLINE_ASSETS_REVISION },
       { url: "/employes", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/employes/nouveau", revision: OFFLINE_ASSETS_REVISION },
       { url: "/presence", revision: OFFLINE_ASSETS_REVISION },
       { url: "/paie", revision: OFFLINE_ASSETS_REVISION },
       { url: "/budget", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/recrutement", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/notifications", revision: OFFLINE_ASSETS_REVISION },
       { url: "/profile", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/employee/dashboard", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/employee/presence", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/employee/leaves", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/employee/documents", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/employee/profile", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/employee/notifications", revision: OFFLINE_ASSETS_REVISION },
+      { url: "/employee/paie", revision: OFFLINE_ASSETS_REVISION },
+    ],
+    runtimeCaching: [
+      {
+        urlPattern: ({ url }) => url.pathname.startsWith("/api/auth/"),
+        handler: "NetworkOnly",
+      },
+      {
+        urlPattern: ({ sameOrigin, url }) =>
+          sameOrigin && url.pathname.startsWith("/api/nest/"),
+        handler: "NetworkFirst",
+        options: {
+          cacheName: "api-nest-cache",
+          networkTimeoutSeconds: 5,
+          expiration: {
+            maxEntries: 80,
+            maxAgeSeconds: 3600,
+          },
+        },
+      },
+      {
+        urlPattern: /\/_next\/data\/.*\.json$/i,
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "rsc-cache",
+          expiration: {
+            maxEntries: 60,
+            maxAgeSeconds: 3600,
+          },
+        },
+      },
+      {
+        urlPattern: /\.(?:jpg|jpeg|gif|png|svg|ico|webp|woff|woff2|ttf|otf|eot)$/i,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "static-media-cache",
+          expiration: {
+            maxEntries: 128,
+            maxAgeSeconds: 86400,
+          },
+        },
+      },
     ],
   },
 });

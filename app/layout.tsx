@@ -7,6 +7,9 @@ import SessionKeeper from "@/components/auth/SessionKeeper";
 import PushNotificationsRoot from "@/components/push/PushNotificationsRoot";
 import ChunkLoadRecovery from "@/components/pwa/ChunkLoadRecovery";
 import PwaInstallPrompt from "@/components/pwa/PwaInstallPrompt";
+import { SwrOfflineConfig } from "@/components/pwa/SwrOfflineConfig";
+import OfflineBanner from "@/components/pwa/OfflineBanner";
+import SyncOnReconnect from "@/components/pwa/SyncOnReconnect";
 import "./globals.css";
 
 const syne = Syne({
@@ -73,7 +76,10 @@ export default function RootLayout({
         className="min-h-screen bg-slate-100 font-sans text-text-primary antialiased"
         suppressHydrationWarning
       >
+        <OfflineBanner />
         <AuthProvider>
+          <SwrOfflineConfig>
+          <SyncOnReconnect />
           <SessionKeeper />
           <TitlebarLayoutShell>
             <ChunkLoadRecovery />
@@ -95,6 +101,7 @@ export default function RootLayout({
             }}
           />
         </TitlebarLayoutShell>
+          </SwrOfflineConfig>
         </AuthProvider>
       </body>
     </html>

@@ -27,6 +27,9 @@ type RefreshWaiter = {
 let refreshWaiters: RefreshWaiter[] = [];
 
 const AUTH_FETCH_TIMEOUT_MS = 20_000;
+/** Render free tier : cold start pouvant dépasser 20s sur POST /api/auth/refresh */
+const AUTH_REFRESH_FETCH_TIMEOUT_MS = 35_000;
+const REFRESH_RETRY_DELAYS_MS = [1_000, 2_000] as const;
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
@@ -80,9 +83,32 @@ export function resetAuthSessionState(): void {
   }
 }
 
-async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRefreshNetworkError(error: unknown): boolean {
+  if (error instanceof Error) {
+    if (error.name === "AbortError") return true;
+    if (error.message === "Failed to fetch" || error.message.includes("NetworkError")) return true;
+  }
+  return error instanceof TypeError;
+}
+
+function isRefreshAuthRejected(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message === "Session expirée. Veuillez vous reconnecter."
+  );
+}
+
+async function authFetch(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs: number = AUTH_FETCH_TIMEOUT_MS
+): Promise<Response> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), AUTH_FETCH_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, {
       ...init,
@@ -159,12 +185,17 @@ export async function refreshAccessToken(): Promise<string> {
   }
 
   isRefreshing = true;
+  const previousToken = accessToken ?? readPersistedAccessTokenRaw();
 
   try {
-    const res = await authFetch(AUTH_REFRESH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
+    const res = await authFetch(
+      AUTH_REFRESH_URL,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      },
+      AUTH_REFRESH_FETCH_TIMEOUT_MS
+    );
 
     const json = await res.json().catch(() => null);
 
@@ -190,11 +221,14 @@ export async function refreshAccessToken(): Promise<string> {
     notifyRefreshSuccess(token);
     return token;
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      const timeoutErr = new Error("Délai dépassé. Vérifiez votre connexion et réessayez.");
-      setAccessToken(null);
-      notifyRefreshFailure(timeoutErr);
-      throw timeoutErr;
+    if (isRefreshNetworkError(error)) {
+      if (previousToken) setAccessToken(previousToken);
+      const networkErr = new Error("Délai dépassé. Vérifiez votre connexion et réessayez.");
+      notifyRefreshFailure(networkErr);
+      throw networkErr;
+    }
+    if (!isRefreshAuthRejected(error) && previousToken) {
+      setAccessToken(previousToken);
     }
     notifyRefreshFailure(error);
     throw error;
@@ -217,9 +251,31 @@ export async function ensureValidAccessToken(): Promise<string> {
 
 /**
  * Restaure la session : jeton valide en cache → sinon refresh (cookie HttpOnly).
+ * Retries avec backoff (1s, 2s) pour absorber les cold starts Render.
  */
 export async function restoreSessionAccessToken(): Promise<string> {
-  return ensureValidAccessToken();
+  const current = getAccessToken() ?? readPersistedAccessTokenRaw();
+  if (current && !shouldRefreshAccessToken(current)) {
+    setAccessToken(current);
+    return current;
+  }
+
+  const maxAttempts = 1 + REFRESH_RETRY_DELAYS_MS.length;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await refreshAccessToken();
+    } catch (error) {
+      lastError = error;
+      if (isRefreshAuthRejected(error)) throw error;
+      if (attempt < REFRESH_RETRY_DELAYS_MS.length) {
+        await delay(REFRESH_RETRY_DELAYS_MS[attempt]);
+      }
+    }
+  }
+
+  throw lastError;
 }
 
 /** Rafraîchissement silencieux (retour app, timer) — ne propage pas l'erreur. */

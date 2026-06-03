@@ -115,6 +115,25 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
+const BV_RH_SYNC_TAG = "bv-rh-sync";
+const BV_RH_SYNC_MESSAGE = "BV_RH_SYNC";
+
+self.addEventListener("sync", (event) => {
+  if (event.tag !== BV_RH_SYNC_TAG) return;
+
+  event.waitUntil(
+    (async () => {
+      const clients = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      for (const client of clients) {
+        client.postMessage({ type: BV_RH_SYNC_MESSAGE });
+      }
+    })()
+  );
+});
+
 self.addEventListener("pushsubscriptionchange", (event) => {
   event.waitUntil(
     (async () => {

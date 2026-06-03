@@ -5,28 +5,78 @@ import { usePathname, useRouter } from "next/navigation";
 import type { UserMePayload } from "@/lib/employee/types";
 import { resolveApiBaseUrl } from "@/lib/resolve-api-url";
 import {
+  AUTH_REFRESH_URL,
+  extractAccessToken,
+  getAccessToken,
   loginRequest,
   logout as authLogout,
-  refreshAccessToken,
+  persistAccessToken,
+  readPersistedAccessTokenRaw,
   resetAuthSessionState,
-  restoreSessionAccessToken,
+  setAccessToken,
   type LoginCredentials,
 } from "@/lib/authClient";
-import { decodeJwtPayload, getHomeRouteByRole, normalizeAppRole } from "@/lib/session";
+import { decodeJwtPayload, getHomeRouteByRole, normalizeAppRole, shouldRefreshAccessToken } from "@/lib/session";
 import AuthLoading from "@/components/auth/AuthLoading";
+import {
+  PROFILE_STORAGE_KEY,
+  persistLastRoute,
+  readCachedProfile as readStoredProfile,
+} from "@/lib/session-storage";
 
 const PUBLIC_PATHS = new Set(["/", "/login"]);
+const AUTH_FETCH_TIMEOUT_MS = 20_000;
 
 type AuthContextValue = {
   user: UserMePayload | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isReconnecting: boolean;
   login: (credentials: LoginCredentials) => Promise<UserMePayload | null>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+/** Erreur bootstrap avec code HTTP connu (401/403) ou indéterminé (réseau, timeout, 5xx). */
+class AuthBootstrapError extends Error {
+  readonly status: number | null;
+
+  constructor(message: string, status: number | null) {
+    super(message);
+    this.name = "AuthBootstrapError";
+    this.status = status;
+  }
+}
+
+function isAuthRejected(err: unknown): boolean {
+  return err instanceof AuthBootstrapError && (err.status === 401 || err.status === 403);
+}
+
+function readCachedProfile(): UserMePayload | null {
+  const stored = readStoredProfile();
+  if (!stored) return null;
+  return normalizeUserMe(stored);
+}
+
+function persistCachedProfile(profile: UserMePayload): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+  } catch {
+    /* quota / mode privé */
+  }
+}
+
+function clearCachedProfile(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(PROFILE_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 function unwrapUserMePayload(json: unknown): UserMePayload {
   const raw = json && typeof json === "object" && "data" in json ? (json as { data: unknown }).data : json;
@@ -76,42 +126,146 @@ function enrichUserProfile(profile: UserMePayload, accessToken?: string): UserMe
   return profile;
 }
 
+async function authFetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), AUTH_FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      credentials: "include",
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new AuthBootstrapError("Délai dépassé", null);
+    }
+    throw new AuthBootstrapError("Erreur réseau", null);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function fetchCurrentUser(accessToken: string): Promise<UserMePayload> {
-  const res = await fetch(`${resolveApiBaseUrl()}/auth/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    credentials: "include",
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await authFetchWithTimeout(`${resolveApiBaseUrl()}/auth/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch (error) {
+    if (error instanceof AuthBootstrapError) throw error;
+    throw new AuthBootstrapError("Erreur réseau", null);
+  }
+
   const json = await res.json().catch(() => null);
-  if (!res.ok) throw new Error("Session invalide");
-  return enrichUserProfile(unwrapUserMePayload(json), accessToken);
+
+  if (res.status === 401 || res.status === 403) {
+    throw new AuthBootstrapError("Session invalide", res.status);
+  }
+  if (!res.ok) {
+    throw new AuthBootstrapError("Erreur serveur", res.status);
+  }
+
+  const profile = enrichUserProfile(unwrapUserMePayload(json), accessToken);
+  persistCachedProfile(profile);
+  return profile;
+}
+
+type AuthTokenPayload = {
+  access_token?: string;
+  accessToken?: string;
+  token?: string;
+};
+
+async function refreshBootstrapToken(): Promise<string> {
+  let res: Response;
+  try {
+    res = await authFetchWithTimeout(AUTH_REFRESH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    if (error instanceof AuthBootstrapError) throw error;
+    throw new AuthBootstrapError("Erreur réseau", null);
+  }
+
+  const json = await res.json().catch(() => null);
+
+  if (res.status === 401 || res.status === 403) {
+    throw new AuthBootstrapError("Session expirée", res.status);
+  }
+  if (!res.ok) {
+    throw new AuthBootstrapError("Impossible de renouveler la session", res.status);
+  }
+
+  const payload =
+    json && typeof json === "object" && "data" in json
+      ? (json as { data: AuthTokenPayload }).data
+      : (json as AuthTokenPayload);
+  const token = extractAccessToken(payload);
+  if (!token) {
+    throw new AuthBootstrapError("Jeton d'accès introuvable", res.status);
+  }
+
+  await persistAccessToken(token);
+  return token;
+}
+
+function ReconnectingBanner() {
+  return (
+    <div
+      role="status"
+      className="no-print fixed inset-x-0 top-0 z-[100] border-b border-amber-200/80 bg-amber-50/95 px-4 py-2 text-center text-xs font-medium text-amber-900 backdrop-blur-sm"
+    >
+      Reconnexion en cours…
+    </div>
+  );
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserMePayload | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const cachedOnInit = readCachedProfile();
+  const [user, setUser] = useState<UserMePayload | null>(cachedOnInit);
+  const [isAuthenticated, setIsAuthenticated] = useState(Boolean(cachedOnInit));
   const [isLoading, setIsLoading] = useState(true);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [suppressLoginRedirect, setSuppressLoginRedirect] = useState(false);
   const pathname = usePathname() || "/";
   const router = useRouter();
 
   const applyUser = useCallback((profile: UserMePayload) => {
+    persistCachedProfile(profile);
     setUser(profile);
     setIsAuthenticated(true);
+    setIsReconnecting(false);
+    setSuppressLoginRedirect(false);
   }, []);
 
   const clearUser = useCallback(() => {
+    clearCachedProfile();
     setUser(null);
     setIsAuthenticated(false);
+    setIsReconnecting(false);
+    setSuppressLoginRedirect(false);
   }, []);
 
   const bootstrap = useCallback(async () => {
-    let token = await restoreSessionAccessToken();
+    let token = getAccessToken() ?? readPersistedAccessTokenRaw() ?? null;
+    if (token) setAccessToken(token);
+
+    const needsRefresh = !token || shouldRefreshAccessToken(token);
+    if (needsRefresh) {
+      token = await refreshBootstrapToken();
+    }
+
+    if (!token) return;
+
     try {
       const profile = await fetchCurrentUser(token);
       applyUser(profile);
       return profile;
-    } catch {
-      token = await refreshAccessToken();
+    } catch (error) {
+      if (!isAuthRejected(error)) throw error;
+      token = await refreshBootstrapToken();
       const profile = await fetchCurrentUser(token);
       applyUser(profile);
       return profile;
@@ -119,24 +273,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [applyUser]);
 
   const refreshSession = useCallback(async () => {
-    await bootstrap();
-  }, [bootstrap]);
+    setIsReconnecting(false);
+    try {
+      await bootstrap();
+    } catch (error) {
+      if (isAuthRejected(error)) {
+        clearUser();
+        resetAuthSessionState();
+        throw error;
+      }
+      const cached = readCachedProfile();
+      if (cached) {
+        setUser(cached);
+        setIsAuthenticated(true);
+        setIsReconnecting(true);
+      } else {
+        setIsReconnecting(true);
+        setSuppressLoginRedirect(true);
+      }
+      throw error;
+    }
+  }, [bootstrap, clearUser]);
 
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
-      if (PUBLIC_PATHS.has(pathname)) {
-        if (!cancelled) setIsLoading(false);
-        return;
-      }
-
       try {
         await bootstrap();
-      } catch {
-        if (!cancelled) {
+      } catch (error) {
+        if (cancelled) return;
+
+        if (isAuthRejected(error)) {
           clearUser();
           resetAuthSessionState();
+          return;
+        }
+
+        const cached = readCachedProfile();
+        if (cached) {
+          setUser(cached);
+          setIsAuthenticated(true);
+          setIsReconnecting(true);
+        } else {
+          setIsReconnecting(true);
+          setSuppressLoginRedirect(true);
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -147,14 +328,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [pathname, bootstrap, clearUser]);
+  }, [bootstrap, clearUser]);
+
+  useEffect(() => {
+    if (!isAuthenticated || isLoading) return;
+    if (PUBLIC_PATHS.has(pathname) || pathname === "/offline") return;
+    persistLastRoute(pathname);
+  }, [isAuthenticated, isLoading, pathname]);
 
   useEffect(() => {
     if (isLoading) return;
 
     const isPublic = PUBLIC_PATHS.has(pathname);
 
-    if (!isAuthenticated && !isPublic) {
+    if (!isAuthenticated && !isPublic && !suppressLoginRedirect) {
       router.replace(`/login?from=${encodeURIComponent(pathname)}`);
       return;
     }
@@ -162,7 +349,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (isAuthenticated && user && pathname === "/login") {
       router.replace(getHomeRouteByRole(user.role));
     }
-  }, [isAuthenticated, isLoading, pathname, router, user]);
+  }, [isAuthenticated, isLoading, pathname, router, user, suppressLoginRedirect]);
 
   const login = useCallback(
     async (credentials: LoginCredentials) => {
@@ -171,6 +358,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let profile: UserMePayload;
       if (result.user) {
         profile = enrichUserProfile(result.user, result.accessToken);
+        persistCachedProfile(profile);
       } else {
         profile = await fetchCurrentUser(result.accessToken);
       }
@@ -193,14 +381,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       isAuthenticated,
       isLoading,
+      isReconnecting,
       login,
       logout,
       refreshSession,
     }),
-    [user, isAuthenticated, isLoading, login, logout, refreshSession]
+    [user, isAuthenticated, isLoading, isReconnecting, login, logout, refreshSession]
   );
 
-  if (isLoading && !PUBLIC_PATHS.has(pathname)) {
+  if (isLoading && !PUBLIC_PATHS.has(pathname) && !user) {
     return (
       <AuthContext.Provider value={value}>
         <AuthLoading />
@@ -208,7 +397,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {isReconnecting ? <ReconnectingBanner /> : null}
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

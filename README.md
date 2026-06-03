@@ -55,6 +55,7 @@ Application disponible sur [http://localhost:3000](http://localhost:3000).
 - Manifest: `app/manifest.ts`
 - Offline fallback: `app/offline/page.tsx`
 - Config Next PWA: `next.config.ts`
+- **Audit technique (offline + session)** : [docs/AUDIT-PWA-AUTH.md](docs/AUDIT-PWA-AUTH.md)
 
 ## Transition
 

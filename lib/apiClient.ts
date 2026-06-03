@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { resolveApiBaseUrl } from "@/lib/resolve-api-url";
 import {
   extractApiErrorMessage,
@@ -17,8 +18,31 @@ import {
   refreshAccessToken,
 } from "@/lib/authClient";
 import { shouldRefreshAccessToken } from "@/lib/session";
+import type { SyncQueueMethod } from "@/lib/db/types";
+import {
+  isOfflineRetryableError,
+  OfflineQueuedError,
+  queueMutation,
+} from "@/lib/sync/syncManager";
 
 export type ApiResponse<T> = { ok: true; data: T } | { ok: false; error: string };
+
+export { OfflineQueuedError } from "@/lib/sync/syncManager";
+
+async function maybeQueueOfflineMutation(
+  path: string,
+  method: SyncQueueMethod,
+  body: unknown,
+  errorMessage: string
+): Promise<never> {
+  if (isAuthApiPath(path) || !isOfflineRetryableError(errorMessage)) {
+    throw new Error(errorMessage);
+  }
+
+  await queueMutation(method, path, body);
+  toast.message("Enregistré hors ligne. Synchronisation à la reconnexion.");
+  throw new OfflineQueuedError();
+}
 
 function getBaseUrl(): string {
   return resolveApiBaseUrl();
@@ -174,8 +198,11 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
     method: "POST",
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!result.ok) throw new Error(result.error);
-  return result.data;
+  if (!result.ok) {
+    await maybeQueueOfflineMutation(path, "POST", body, result.error);
+  }
+  if (result.ok) return result.data;
+  throw new Error("Unreachable");
 }
 
 export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
@@ -183,14 +210,21 @@ export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
     method: "PUT",
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!result.ok) throw new Error(result.error);
-  return result.data;
+  if (!result.ok) {
+    await maybeQueueOfflineMutation(path, "PUT", body, result.error);
+  }
+  if (result.ok) return result.data;
+  throw new Error("Unreachable");
 }
 
 export async function apiDelete<T>(path: string): Promise<T> {
-  const result = await apiFetch<T>(`${path}/delete`, { method: "POST" });
-  if (!result.ok) throw new Error(result.error);
-  return result.data;
+  const deletePath = `${path}/delete`;
+  const result = await apiFetch<T>(deletePath, { method: "POST" });
+  if (!result.ok) {
+    await maybeQueueOfflineMutation(deletePath, "POST", undefined, result.error);
+  }
+  if (result.ok) return result.data;
+  throw new Error("Unreachable");
 }
 
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
