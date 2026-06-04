@@ -284,6 +284,25 @@ export async function sendPushSubscription(subscription: PushSubscription): Prom
   if (!result.ok) throw new Error(result.error);
 }
 
+/** Ré-enregistre l’abonnement navigateur sur le serveur (JWT requis). */
+export async function syncPushSubscriptionToServer(): Promise<void> {
+  const registration = await waitForServiceWorkerRegistration(12_000);
+  if (!registration?.active) {
+    throw new Error("Service worker indisponible — rechargez l'application.");
+  }
+
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    throw new Error("Aucun abonnement sur cet appareil — touchez « Activer les notifications ».");
+  }
+
+  await withPushTimeout(
+    sendPushSubscription(subscription),
+    15_000,
+    "Enregistrement sur le serveur trop long — vérifiez la connexion."
+  );
+}
+
 export type PushTestResult = {
   sent: number;
   failed: number;

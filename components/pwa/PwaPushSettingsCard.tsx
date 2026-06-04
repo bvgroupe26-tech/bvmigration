@@ -1,14 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { Bell, Download, Send, Smartphone } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bell, Download, RefreshCw, Send, Smartphone } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
-import { sendTestPushNotification } from "@/lib/push-notifications";
+import {
+  fetchPushStatus,
+  sendTestPushNotification,
+  syncPushSubscriptionToServer,
+} from "@/lib/push-notifications";
 import GlassCard from "@/components/ui/GlassCard";
 
 export default function PwaPushSettingsCard() {
+  const { isAuthenticated } = useAuth();
   const { openPrompt, isStandalone, canNativeInstall, install, installing } = usePwaInstall();
   const {
     isSupported,
@@ -19,6 +25,78 @@ export default function PwaPushSettingsCard() {
     subscribe,
   } = usePushNotifications();
   const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  /** null = vérification en cours */
+  const [serverRegistered, setServerRegistered] = useState<boolean | null>(null);
+  const [serverUserId, setServerUserId] = useState<number | null>(null);
+  const autoSyncDone = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || !isSubscribed) {
+      setServerRegistered(null);
+      autoSyncDone.current = false;
+      return;
+    }
+
+    let cancelled = false;
+    void fetchPushStatus()
+      .then((status) => {
+        if (!cancelled) {
+          setServerUserId(status.userId);
+          setServerRegistered(status.subscriptionCount > 0);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setServerRegistered(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isSubscribed]);
+
+  useEffect(() => {
+    if (
+      !isAuthenticated ||
+      !isSubscribed ||
+      serverRegistered !== false ||
+      autoSyncDone.current
+    ) {
+      return;
+    }
+    autoSyncDone.current = true;
+
+    void (async () => {
+      try {
+        await syncPushSubscriptionToServer();
+        const status = await fetchPushStatus();
+        setServerRegistered(status.subscriptionCount > 0);
+        if (status.subscriptionCount > 0) {
+          toast.success("Abonnement enregistré sur le serveur — vous pouvez tester la notification.");
+        }
+      } catch {
+        /* bouton manuel ci-dessous */
+      }
+    })();
+  }, [isAuthenticated, isSubscribed, serverRegistered]);
+
+  async function handleSyncToServer() {
+    setSyncing(true);
+    try {
+      await syncPushSubscriptionToServer();
+      const status = await fetchPushStatus();
+      setServerRegistered(status.subscriptionCount > 0);
+      if (status.subscriptionCount > 0) {
+        toast.success("Appareil enregistré — retestez la notification.");
+      } else {
+        toast.error("Échec d'enregistrement — reconnectez-vous puis réessayez.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Synchronisation impossible");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function handleTestPush() {
     setTesting(true);
@@ -130,13 +208,33 @@ export default function PwaPushSettingsCard() {
           <Bell className="h-4 w-4" />
           {loading ? "Activation…" : "Activer les notifications"}
         </button>
+      ) : serverRegistered === false ? (
+        <div className="space-y-2">
+          <p className="text-center text-xs font-medium text-amber-800">
+            Permission OK sur le téléphone, mais l&apos;appareil n&apos;est pas encore enregistré sur
+            le serveur{serverUserId != null ? ` (compte #${serverUserId})` : ""}.
+          </p>
+          <button
+            type="button"
+            onClick={() => void handleSyncToServer()}
+            disabled={syncing}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2F5F9D] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1F3F73] disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Enregistrement…" : "Enregistrer sur le serveur"}
+          </button>
+        </div>
       ) : (
         <div className="space-y-2">
-          <p className="text-center text-xs font-medium text-green-700">Notifications activées</p>
+          <p className="text-center text-xs font-medium text-green-700">
+            {serverRegistered === null
+              ? "Vérification du serveur…"
+              : "Notifications activées et enregistrées"}
+          </p>
           <button
             type="button"
             onClick={() => void handleTestPush()}
-            disabled={testing}
+            disabled={testing || serverRegistered !== true}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#2F5F9D]/30 bg-[#E8F0FA] px-4 py-2.5 text-sm font-semibold text-[#1F3F73] transition hover:bg-[#dbe8f5] disabled:opacity-60"
           >
             <Send className="h-4 w-4" />
