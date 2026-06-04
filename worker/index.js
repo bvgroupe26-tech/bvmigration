@@ -57,39 +57,72 @@ async function fetchVapidPublicKey() {
   );
 }
 
-self.addEventListener("push", (event) => {
+function parsePushPayload(event) {
   let payload = {};
-  if (event.data) {
-    try {
-      payload = event.data.json();
-    } catch {
-      try {
-        payload = { body: event.data.text() };
-      } catch {
-        payload = {};
-      }
-    }
+  if (!event.data) return payload;
+  try {
+    payload = event.data.json();
+    return payload;
+  } catch {
+    /* iOS / certains navigateurs */
   }
+  try {
+    const text = event.data.text();
+    if (text) payload = JSON.parse(text);
+  } catch {
+    payload = {};
+  }
+  return payload;
+}
 
+/** Options compatibles iOS PWA (éviter vibrate/renotify qui peuvent faire échouer showNotification). */
+function buildNotificationOptions(payload) {
   const data = payload.data || {};
   const title = payload.title || "BV Groupe RH";
   const body = payload.body || "Nouvelle notification";
-  const icon = assetUrl(payload.icon || data.icon || DEFAULT_ICON);
-  const badge = assetUrl(payload.badge || data.badge || DEFAULT_BADGE);
   const tag = payload.tag || data.tag || "bv-groupe-rh";
-  const url = data.url || payload.url || "/notifications";
+  const url = data.url || payload.url || "/employee/notifications";
 
+  const options = {
+    body,
+    tag,
+    data: { url, ...data },
+  };
+
+  try {
+    options.icon = assetUrl(DEFAULT_ICON);
+    options.badge = assetUrl(DEFAULT_BADGE);
+  } catch {
+    /* icônes optionnelles */
+  }
+
+  return { title, options };
+}
+
+self.addEventListener("push", (event) => {
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon,
-      badge,
-      tag,
-      renotify: true,
-      requireInteraction: false,
-      vibrate: [200, 100, 200],
-      data: { url, ...data },
-    })
+    (async () => {
+      const payload = parsePushPayload(event);
+      const { title, options } = buildNotificationOptions(payload);
+
+      try {
+        await self.registration.showNotification(title, options);
+        return;
+      } catch (err) {
+        console.warn("[bv-sw] showNotification (complet) échoué:", err);
+      }
+
+      try {
+        await self.registration.showNotification(title, {
+          body: options.body,
+          tag: options.tag,
+          data: options.data,
+        });
+      } catch (err) {
+        console.error("[bv-sw] showNotification (minimal) échoué:", err);
+        throw err;
+      }
+    })()
   );
 });
 
