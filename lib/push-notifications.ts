@@ -247,7 +247,6 @@ export function subscriptionToPayload(subscription: PushSubscription) {
 
   return {
     endpoint: subscription.endpoint,
-    expirationTime: subscription.expirationTime,
     keys: {
       p256dh: p256dh ? bufferToBase64(p256dh) : "",
       auth: auth ? bufferToBase64(auth) : "",
@@ -283,6 +282,14 @@ export async function sendPushSubscription(subscription: PushSubscription): Prom
     body: JSON.stringify(subscriptionToPayload(subscription)),
   });
   if (!result.ok) throw new Error(result.error);
+}
+
+export async function sendTestPushNotification(): Promise<{ sent: number; failed: number }> {
+  const result = await apiFetch<{ sent: number; failed: number }>("/push/test", {
+    method: "POST",
+  });
+  if (!result.ok) throw new Error(result.error);
+  return result.data ?? { sent: 0, failed: 0 };
 }
 
 export async function removePushSubscription(endpoint: string): Promise<void> {

@@ -1,9 +1,11 @@
 "use client";
 
-import { Bell, Download, Smartphone } from "lucide-react";
+import { useState } from "react";
+import { Bell, Download, Send, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
+import { sendTestPushNotification } from "@/lib/push-notifications";
 import GlassCard from "@/components/ui/GlassCard";
 
 export default function PwaPushSettingsCard() {
@@ -16,6 +18,31 @@ export default function PwaPushSettingsCard() {
     needsInstallFirst,
     subscribe,
   } = usePushNotifications();
+  const [testing, setTesting] = useState(false);
+
+  async function handleTestPush() {
+    setTesting(true);
+    try {
+      const { sent, failed } = await sendTestPushNotification();
+      if (sent > 0) {
+        toast.success(
+          "Notification test envoyée — fermez l'app et vérifiez la barre de notifications"
+        );
+      } else if (failed > 0) {
+        toast.error(
+          "Échec d'envoi — vérifiez que NEXT_PUBLIC_VAPID_PUBLIC_KEY (Vercel) = VAPID_PUBLIC_KEY (Render)"
+        );
+      } else {
+        toast.error(
+          "Aucun envoi — réactivez les notifications ou vérifiez VAPID sur Render"
+        );
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Test push impossible");
+    } finally {
+      setTesting(false);
+    }
+  }
 
   if (!isSupported) {
     return (
@@ -86,7 +113,18 @@ export default function PwaPushSettingsCard() {
           {loading ? "Activation…" : "Activer les notifications"}
         </button>
       ) : (
-        <p className="text-center text-xs font-medium text-green-700">Notifications activées</p>
+        <div className="space-y-2">
+          <p className="text-center text-xs font-medium text-green-700">Notifications activées</p>
+          <button
+            type="button"
+            onClick={() => void handleTestPush()}
+            disabled={testing}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#2F5F9D]/30 bg-[#E8F0FA] px-4 py-2.5 text-sm font-semibold text-[#1F3F73] transition hover:bg-[#dbe8f5] disabled:opacity-60"
+          >
+            <Send className="h-4 w-4" />
+            {testing ? "Envoi…" : "Tester une notification (hors app)"}
+          </button>
+        </div>
       )}
 
       {needsInstallFirst ? (

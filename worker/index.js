@@ -26,7 +26,6 @@ function subscriptionToJson(subscription) {
   const auth = subscription.getKey("auth");
   return {
     endpoint: subscription.endpoint,
-    expirationTime: subscription.expirationTime,
     keys: {
       p256dh: p256dh ? bufferToBase64(p256dh) : "",
       auth: auth ? bufferToBase64(auth) : "",
