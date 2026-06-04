@@ -136,6 +136,18 @@ navigator.serviceWorker.ready.then(r =>
 
 ---
 
+## 3b. Diagnostic abonnement (recommandé avant le test)
+
+| Champ | Valeur |
+|--------|--------|
+| Method | `GET` |
+| URL | `https://bv-groupe.onrender.com/api/push/status` |
+| Authorization | Bearer `{{accessToken}}` |
+
+Si `subscriptionCount` vaut **0**, `POST /push/test` renverra toujours `sent: 0` — activez les notifications dans l’app (Profil) avec le **même email** que le token Postman.
+
+---
+
 ## 4. Envoyer une notification test
 
 | Champ | Valeur |
@@ -149,9 +161,10 @@ navigator.serviceWorker.ready.then(r =>
 
 | `data` | Signification |
 |--------|----------------|
-| `{ "sent": 1, "failed": 0 }` | Envoyé au serveur push → alerte OS si app fermée + SW OK |
-| `{ "sent": 0, "failed": 0 }` | Pas d’abonnement en base ou VAPID désactivé |
-| `{ "sent": 0, "failed": 1 }` | Abonnement invalide ou clés VAPID incorrectes |
+| `{ "sent": 1, "failed": 0, "message": "…" }` | Envoyé → alerte OS si app fermée + SW OK |
+| `{ "sent": 0, "failed": 0, "subscriptionCount": 0, "message": "Aucun appareil abonné…" }` | Aucune ligne dans `push_subscriptions` pour ce `userId` |
+| `{ "sent": 0, "failed": 0, "vapidConfigured": false }` | VAPID manquant sur Render |
+| `{ "sent": 0, "failed": 1 }` | Abonnement invalide ou clés VAPID front ≠ Render |
 
 **Ensuite :** fermer l’app sur le téléphone et regarder les notifications système.
 

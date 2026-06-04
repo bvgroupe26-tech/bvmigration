@@ -284,8 +284,31 @@ export async function sendPushSubscription(subscription: PushSubscription): Prom
   if (!result.ok) throw new Error(result.error);
 }
 
-export async function sendTestPushNotification(): Promise<{ sent: number; failed: number }> {
-  const result = await apiFetch<{ sent: number; failed: number }>("/push/test", {
+export type PushTestResult = {
+  sent: number;
+  failed: number;
+  userId?: number;
+  vapidConfigured?: boolean;
+  subscriptionCount?: number;
+  message?: string;
+};
+
+export async function fetchPushStatus(): Promise<{
+  userId: number;
+  vapidConfigured: boolean;
+  subscriptionCount: number;
+}> {
+  const result = await apiFetch<{
+    userId: number;
+    vapidConfigured: boolean;
+    subscriptionCount: number;
+  }>("/push/status");
+  if (!result.ok) throw new Error(result.error);
+  return result.data;
+}
+
+export async function sendTestPushNotification(): Promise<PushTestResult> {
+  const result = await apiFetch<PushTestResult>("/push/test", {
     method: "POST",
   });
   if (!result.ok) throw new Error(result.error);

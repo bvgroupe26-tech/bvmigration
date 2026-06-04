@@ -23,18 +23,23 @@ export default function PwaPushSettingsCard() {
   async function handleTestPush() {
     setTesting(true);
     try {
-      const { sent, failed } = await sendTestPushNotification();
-      if (sent > 0) {
+      const result = await sendTestPushNotification();
+      if (result.message) {
+        if (result.sent > 0) toast.success(result.message);
+        else toast.error(result.message);
+        return;
+      }
+      if (result.sent > 0) {
         toast.success(
           "Notification test envoyée — fermez l'app et vérifiez la barre de notifications"
         );
-      } else if (failed > 0) {
+      } else if (result.failed > 0) {
         toast.error(
           "Échec d'envoi — vérifiez que NEXT_PUBLIC_VAPID_PUBLIC_KEY (Vercel) = VAPID_PUBLIC_KEY (Render)"
         );
       } else {
         toast.error(
-          "Aucun envoi — réactivez les notifications ou vérifiez VAPID sur Render"
+          `Aucun envoi (user #${result.userId ?? "?"}, ${result.subscriptionCount ?? 0} appareil(s) en base)`
         );
       }
     } catch (err) {
@@ -56,7 +61,20 @@ export default function PwaPushSettingsCard() {
 
   async function handleEnablePush() {
     const ok = await subscribe({ requestPermission: true });
-    if (ok) return;
+    if (ok) {
+      try {
+        const { fetchPushStatus } = await import("@/lib/push-notifications");
+        const status = await fetchPushStatus();
+        if (status.subscriptionCount === 0) {
+          toast.error(
+            "Permission accordée mais l'abonnement n'est pas en base — réessayez ou contactez l'admin"
+          );
+        }
+      } catch {
+        /* toast succès déjà affiché par subscribe */
+      }
+      return;
+    }
     if (needsInstallFirst) {
       toast.message("Installez d'abord l'application sur l'écran d'accueil.");
       return;
