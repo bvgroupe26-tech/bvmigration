@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import NotificationFilters from "@/components/notifications/NotificationFilters";
@@ -20,6 +22,7 @@ export default function NotificationsBell({
   className,
   iconClassName,
 }: NotificationsBellProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -69,11 +72,21 @@ export default function NotificationsBell({
     }
   }
 
+  const listHref = context === "employee" ? "/employee/notifications" : "/notifications";
+
+  function handleBellClick() {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
+      router.push(listHref);
+      return;
+    }
+    setOpen((v) => !v);
+  }
+
   return (
     <div ref={rootRef} className={cn("relative", className)}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleBellClick}
         className={cn(
           "relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-[#2F5F9D]/30 hover:bg-[#E8F0FA] hover:text-[#1F3F73]",
           open && "border-[#2F5F9D]/40 bg-[#E8F0FA] text-[#1F3F73]",

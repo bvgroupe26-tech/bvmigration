@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/apiClient";
+import { getAccessToken } from "@/lib/authClient";
 
 const VAPID_ENV_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
@@ -22,9 +23,6 @@ export function wasPushBannerDismissed(): boolean {
 export function dismissPushBanner(): void {
   localStorage.setItem(PUSH_BANNER_DISMISS_KEY, String(Date.now()));
 }
-
-/** Attend le SW next-pwa (ne pas enregistrer un second /sw.js). */
-const SW_URL = "/sw.js";
 
 function raceTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   return Promise.race([
@@ -53,6 +51,7 @@ export async function withPushTimeout<T>(
   }
 }
 
+/** Attend le SW enregistré par next-pwa (register: true) — sans second register(). */
 export async function waitForServiceWorkerRegistration(
   maxWaitMs = 12_000
 ): Promise<ServiceWorkerRegistration | null> {
@@ -64,22 +63,10 @@ export async function waitForServiceWorkerRegistration(
   const perWaitMs = Math.min(2_500, maxWaitMs);
 
   while (Date.now() < deadline) {
-    let reg = await navigator.serviceWorker.getRegistration("/");
-    if (reg?.active) return reg;
+    const ready = await raceTimeout(navigator.serviceWorker.ready, perWaitMs);
+    if (ready?.active) return ready;
 
-    if (!reg && Date.now() > deadline - maxWaitMs + 3_000) {
-      try {
-        reg = await navigator.serviceWorker.register(SW_URL, { scope: "/" });
-        await raceTimeout(navigator.serviceWorker.ready, perWaitMs);
-        reg = await navigator.serviceWorker.getRegistration("/");
-        if (reg?.active) return reg;
-      } catch {
-        /* next-pwa peut prendre le relais */
-      }
-    }
-
-    await raceTimeout(navigator.serviceWorker.ready, perWaitMs);
-    reg = await navigator.serviceWorker.getRegistration("/");
+    const reg = await navigator.serviceWorker.getRegistration("/");
     if (reg?.active) return reg;
 
     await new Promise((resolve) => setTimeout(resolve, 350));
@@ -178,6 +165,14 @@ export async function ensureWebPushSubscription(
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
       });
+    }
+
+    if (!getAccessToken()) {
+      return {
+        ok: false,
+        reason: "error",
+        message: "Connectez-vous pour enregistrer les notifications sur le serveur.",
+      };
     }
 
     await withPushTimeout(
@@ -340,4 +335,31 @@ export async function removePushSubscription(endpoint: string): Promise<void> {
     body: JSON.stringify({ endpoint }),
   });
   if (!result.ok) throw new Error(result.error);
+}
+
+/** Abonnement push sans hook (bootstrap auth, resync SW). */
+export async function subscribePush(): Promise<boolean> {
+  if (!getAccessToken()) return false;
+  const result = await ensureWebPushSubscription(false);
+  return result.ok;
+}
+
+/** Après login / refresh session : recréer ou ré-enregistrer la subscription côté serveur. */
+export async function resyncPushAfterAuth(): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  if (Notification.permission !== "granted") return;
+  if (!getAccessToken()) return;
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const existing = await registration.pushManager.getSubscription();
+    if (!existing) {
+      await ensureWebPushSubscription(false);
+      return;
+    }
+    await syncPushSubscriptionToServer();
+  } catch {
+    /* silencieux au bootstrap */
+  }
 }

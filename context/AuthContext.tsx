@@ -241,6 +241,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSuppressLoginRedirect(false);
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(BV_AUTH_READY_EVENT));
+      void import("@/lib/push-notifications").then(({ resyncPushAfterAuth }) =>
+        resyncPushAfterAuth()
+      );
     }
   }, []);
 

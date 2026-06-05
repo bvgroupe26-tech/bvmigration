@@ -84,7 +84,31 @@ export default function NotificationList({
           return (
             <li key={n.id}>
               <button type="button" onClick={() => void handleClick(n)} className={className}>
-                {content}
+                <Link
+                  href={href}
+                  onClick={(e) => e.stopPropagation()}
+                  className={cn(
+                    "mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition hover:ring-2 hover:ring-[#2F5F9D]/30",
+                    n.lu ? "bg-slate-100 text-slate-500" : "bg-[#E8F0FA] text-[#2F5F9D]"
+                  )}
+                  aria-label={`Ouvrir : ${n.titre}`}
+                >
+                  <Icon className="h-4 w-4" />
+                </Link>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className={cn("text-sm leading-snug", n.lu ? "font-medium text-slate-700" : "font-semibold text-slate-900")}>
+                      {n.titre}
+                    </p>
+                    {!n.lu && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#2F5F9D]" aria-hidden />}
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-xs text-slate-600">{n.message}</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-slate-400">
+                    <span>{NOTIFICATION_TYPE_LABELS[n.type]}</span>
+                    <span>·</span>
+                    <span>{formatNotificationDate(n.created_at)}</span>
+                  </div>
+                </div>
               </button>
             </li>
           );

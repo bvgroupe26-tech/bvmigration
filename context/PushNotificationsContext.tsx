@@ -10,12 +10,14 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 import { canUseWebPush, needsPwaInstallForPush } from "@/lib/push-device";
 import { PWA_INSTALLED_EVENT } from "@/lib/pwa-install";
 import {
   ensureWebPushSubscription,
-  isValidVapidPublicKey,
   removePushSubscription,
+  resyncPushAfterAuth,
+  syncPushSubscriptionToServer,
   waitForServiceWorkerRegistration,
   withPushTimeout,
   type EnsurePushResult,
@@ -26,6 +28,7 @@ function isElectron(): boolean {
 }
 
 const SUBSCRIBE_TIMEOUT_MS = 22_000;
+const PUSH_RESYNC_MESSAGE = "BV_PUSH_RESYNC";
 
 type PushNotificationsContextValue = {
   isSupported: boolean;
@@ -41,6 +44,7 @@ type PushNotificationsContextValue = {
 const PushNotificationsContext = createContext<PushNotificationsContextValue | null>(null);
 
 export function PushNotificationsProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [isSupported, setIsSupported] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission>("default");
@@ -54,6 +58,7 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
       return;
     }
 
+    // next-pwa enregistre déjà /sw.js — on attend ready sans second register()
     const reg = await waitForServiceWorkerRegistration(4_000);
     if (!reg) {
       setIsSubscribed(false);
@@ -83,6 +88,11 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
 
     const onPwaInstalled = () => setNeedsInstallFirst(needsPwaInstallForPush());
 
+    const onSwPushResync = (event: MessageEvent) => {
+      if (event.data?.type !== PUSH_RESYNC_MESSAGE || !isAuthenticated) return;
+      void syncPushSubscriptionToServer().then(() => syncSubscriptionState());
+    };
+
     if (navigator.permissions?.query) {
       void navigator.permissions
         .query({ name: "notifications" as PermissionName })
@@ -93,16 +103,28 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
     }
 
     window.addEventListener(PWA_INSTALLED_EVENT, onPwaInstalled);
+    navigator.serviceWorker?.addEventListener("message", onSwPushResync);
 
     return () => {
       window.removeEventListener(PWA_INSTALLED_EVENT, onPwaInstalled);
+      navigator.serviceWorker?.removeEventListener("message", onSwPushResync);
     };
-  }, [syncSubscriptionState]);
+  }, [isAuthenticated, syncSubscriptionState]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !isSupported) return;
+    void resyncPushAfterAuth().then(() => syncSubscriptionState());
+  }, [isAuthenticated, isSupported, syncSubscriptionState]);
 
   const subscribe = useCallback(
     async (opts?: { silent?: boolean; requestPermission?: boolean }): Promise<boolean> => {
       if (!isSupported) {
         if (!opts?.silent) toast.error("Notifications push non supportées sur ce navigateur.");
+        return false;
+      }
+
+      if (!isAuthenticated) {
+        if (!opts?.silent) toast.error("Connectez-vous pour activer les notifications.");
         return false;
       }
 
@@ -149,7 +171,7 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
         void syncSubscriptionState();
       }
     },
-    [isSupported, syncSubscriptionState]
+    [isAuthenticated, isSupported, syncSubscriptionState]
   );
 
   const unsubscribe = useCallback(async (): Promise<boolean> => {
