@@ -11,7 +11,6 @@ import BottomNavBar from "@/components/layout/BottomNavBar";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
 import { EMPLOYEE_MOBILE_TABS, EMPLOYEE_NAV, getEmployeePageTitle, isNavActive } from "@/lib/nav-config";
 import { useAuth } from "@/context/AuthContext";
-import { useNotificationsFeed } from "@/hooks/useNotifications";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
 import { cn, getAvatarGradient, getInitials } from "@/lib/utils";
 
@@ -28,7 +27,6 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
   const pathname = usePathname() || "/employee/dashboard";
   const router = useRouter();
   const { logout } = useAuth();
-  const { unreadCount } = useNotificationsFeed();
   const mainContentRef = useRef<HTMLDivElement>(null);
   const title = getEmployeePageTitle(pathname);
 
@@ -201,7 +199,6 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
         className="lg:hidden"
         items={EMPLOYEE_MOBILE_TABS}
         pathname={pathname}
-        badgeByHref={{ "/employee/notifications": unreadCount }}
       />
     </div>
   );
