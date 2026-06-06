@@ -27,7 +27,7 @@ function isElectron(): boolean {
   return typeof window !== "undefined" && (window as Window & { electronAPI?: unknown }).electronAPI != null;
 }
 
-const SUBSCRIBE_TIMEOUT_MS = 30_000;
+const SUBSCRIBE_TIMEOUT_MS = 45_000;
 const PUSH_RESYNC_MESSAGE = "BV_PUSH_RESYNC";
 
 type PushNotificationsContextValue = {
@@ -59,14 +59,16 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
     }
 
     // next-pwa enregistre déjà /sw.js — on attend ready sans second register()
-    const reg = await waitForServiceWorkerRegistration(8_000);
-    if (!reg) {
+    const reg = await waitForServiceWorkerRegistration(5_000);
+    if (!reg?.pushManager) {
       setIsSubscribed(false);
+      setPermission(Notification.permission);
       return;
     }
 
     const subscription = await reg.pushManager.getSubscription();
     setIsSubscribed(Boolean(subscription));
+    setPermission(Notification.permission);
   }, []);
 
   useEffect(() => {
@@ -102,11 +104,22 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
         .catch(() => undefined);
     }
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        setPermission(Notification.permission);
+        void syncSubscriptionState();
+      }
+    };
+
     window.addEventListener(PWA_INSTALLED_EVENT, onPwaInstalled);
+    window.addEventListener("focus", onPermissionChange);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     navigator.serviceWorker?.addEventListener("message", onSwPushResync);
 
     return () => {
       window.removeEventListener(PWA_INSTALLED_EVENT, onPwaInstalled);
+      window.removeEventListener("focus", onPermissionChange);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       navigator.serviceWorker?.removeEventListener("message", onSwPushResync);
     };
   }, [isAuthenticated, syncSubscriptionState]);
@@ -173,6 +186,22 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
     },
     [isAuthenticated, isSupported, syncSubscriptionState]
   );
+
+  /** Permission déjà accordée dans le navigateur → finaliser l'abonnement push automatiquement. */
+  useEffect(() => {
+    if (
+      !isAuthenticated ||
+      !isSupported ||
+      isSubscribed ||
+      loading ||
+      inFlightRef.current ||
+      Notification.permission !== "granted"
+    ) {
+      return;
+    }
+
+    void subscribe({ silent: true, requestPermission: false });
+  }, [isAuthenticated, isSupported, isSubscribed, loading, subscribe]);
 
   const unsubscribe = useCallback(async (): Promise<boolean> => {
     if (!isSupported || inFlightRef.current) return false;

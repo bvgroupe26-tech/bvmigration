@@ -10,11 +10,39 @@ function getWorkbox(): WorkboxWindow | null {
   return workbox?.register ? workbox : null;
 }
 
-/** Enregistre le SW dès le chargement (next-pwa workbox ou fallback /sw.js). */
+async function getAnyRegistration(): Promise<ServiceWorkerRegistration | null> {
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  if (registrations.length === 0) return null;
+  return registrations.find((reg) => reg.active) ?? registrations[0] ?? null;
+}
+
+function waitForWorkerState(
+  worker: ServiceWorker,
+  timeoutMs: number
+): Promise<boolean> {
+  if (worker.state === "activated") return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    const onChange = () => {
+      if (worker.state === "activated" || worker.state === "redundant") {
+        clearTimeout(timer);
+        worker.removeEventListener("statechange", onChange);
+        resolve(worker.state === "activated");
+      }
+    };
+    worker.addEventListener("statechange", onChange);
+  });
+}
+
+/** Enregistre le SW (workbox next-pwa ou fallback /sw.js). */
 export async function bootstrapServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return null;
   }
+
+  const existing = await getAnyRegistration();
+  if (existing) return existing;
 
   try {
     const workbox = getWorkbox();
@@ -22,24 +50,22 @@ export async function bootstrapServiceWorker(): Promise<ServiceWorkerRegistratio
       return await workbox.register();
     }
   } catch {
-    /* fallback ci-dessous */
-  }
-
-  const existing = await navigator.serviceWorker.getRegistrations();
-  if (existing.length > 0) {
-    return existing.find((reg) => reg.active) ?? existing[0] ?? null;
+    /* fallback */
   }
 
   try {
     return await navigator.serviceWorker.register(SW_PATH, { scope: "/" });
   } catch {
-    const regs = await navigator.serviceWorker.getRegistrations();
-    return regs[0] ?? null;
+    return getAnyRegistration();
   }
 }
 
-export async function waitForControllingServiceWorker(
-  maxWaitMs = 20_000
+/**
+ * Résout une registration utilisable pour PushManager.
+ * Ne bloque pas sur navigator.serviceWorker.ready (peut pendre sans controller).
+ */
+export async function resolvePushServiceWorkerRegistration(
+  maxWaitMs = 8_000
 ): Promise<ServiceWorkerRegistration | null> {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return null;
@@ -47,52 +73,25 @@ export async function waitForControllingServiceWorker(
 
   await bootstrapServiceWorker();
 
-  if (navigator.serviceWorker.controller) {
-    try {
-      return await navigator.serviceWorker.ready;
-    } catch {
-      /* continue */
-    }
-  }
+  const deadline = Date.now() + maxWaitMs;
 
-  return new Promise((resolve) => {
-    const deadline = Date.now() + maxWaitMs;
-    let settled = false;
+  while (Date.now() < deadline) {
+    const registration = await getAnyRegistration();
+    if (registration) {
+      if (registration.active) return registration;
 
-    const finish = async () => {
-      if (settled) return;
-      settled = true;
-      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-
-      const regs = await navigator.serviceWorker.getRegistrations();
-      const reg = regs.find((r) => r.active) ?? regs[0] ?? null;
-      resolve(reg);
-    };
-
-    const onControllerChange = () => {
-      void finish();
-    };
-
-    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
-
-    void (async () => {
-      try {
-        const ready = await Promise.race([
-          navigator.serviceWorker.ready,
-          new Promise<null>((r) => setTimeout(() => r(null), Math.min(5_000, maxWaitMs))),
-        ]);
-        if (ready && !settled) {
-          settled = true;
-          navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
-          resolve(ready);
-          return;
-        }
-      } catch {
-        /* ignore */
+      const worker = registration.installing || registration.waiting;
+      if (worker) {
+        await waitForWorkerState(worker, Math.min(3_000, deadline - Date.now()));
+        if (registration.active) return registration;
       }
 
-      const remaining = Math.max(0, deadline - Date.now());
-      setTimeout(() => void finish(), remaining);
-    })();
-  });
+      if (registration.pushManager) return registration;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+
+  const last = await getAnyRegistration();
+  return last?.pushManager ? last : null;
 }

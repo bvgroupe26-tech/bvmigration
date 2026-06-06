@@ -1,10 +1,7 @@
 import { apiFetch } from "@/lib/apiClient";
 import { getAccessToken } from "@/lib/authClient";
 import { needsPwaInstallForPush } from "@/lib/push-device";
-import {
-  bootstrapServiceWorker,
-  waitForControllingServiceWorker,
-} from "@/lib/pwa-service-worker";
+import { resolvePushServiceWorkerRegistration } from "@/lib/pwa-service-worker";
 import { isStandaloneMode } from "@/lib/pwa-install";
 
 const VAPID_ENV_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -30,15 +27,6 @@ export function dismissPushBanner(): void {
   localStorage.setItem(PUSH_BANNER_DISMISS_KEY, String(Date.now()));
 }
 
-function raceTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
-  return Promise.race([
-    promise,
-    new Promise<null>((resolve) => {
-      setTimeout(() => resolve(null), ms);
-    }),
-  ]);
-}
-
 export async function withPushTimeout<T>(
   promise: Promise<T>,
   ms: number,
@@ -57,51 +45,10 @@ export async function withPushTimeout<T>(
   }
 }
 
-/** Attend le SW enregistré par next-pwa (register: true) — sans second register(). */
-function waitForWorkerActivation(
-  registration: ServiceWorkerRegistration,
-  timeoutMs: number
+export async function waitForServiceWorkerRegistration(
+  maxWaitMs = 8_000
 ): Promise<ServiceWorkerRegistration | null> {
-  if (registration.active) return Promise.resolve(registration);
-
-  return new Promise((resolve) => {
-    const deadline = Date.now() + timeoutMs;
-    let worker = registration.installing || registration.waiting;
-
-    const finish = () => {
-      resolve(registration.active ? registration : null);
-    };
-
-    const attach = (sw: ServiceWorker) => {
-      const onStateChange = () => {
-        if (sw.state === "activated" || sw.state === "redundant") {
-          sw.removeEventListener("statechange", onStateChange);
-          finish();
-        }
-      };
-      sw.addEventListener("statechange", onStateChange);
-      if (sw.state === "activated") {
-        sw.removeEventListener("statechange", onStateChange);
-        finish();
-      }
-    };
-
-    if (worker) {
-      attach(worker);
-    } else {
-      void registration.update().catch(() => undefined);
-      worker = registration.installing || registration.waiting;
-      if (worker) attach(worker);
-    }
-
-    setTimeout(finish, Math.max(0, deadline - Date.now()));
-  });
-}
-
-async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
-  const registrations = await navigator.serviceWorker.getRegistrations();
-  if (registrations.length === 0) return null;
-  return registrations.find((reg) => reg.active) ?? registrations[0] ?? null;
+  return resolvePushServiceWorkerRegistration(maxWaitMs);
 }
 
 function serviceWorkerUnavailableMessage(): string {
@@ -119,43 +66,6 @@ function serviceWorkerUnavailableMessage(): string {
   }
 
   return `Service worker indisponible. Rechargez la page ou installez l'application.${devHint}`;
-}
-
-export async function waitForServiceWorkerRegistration(
-  maxWaitMs = 12_000
-): Promise<ServiceWorkerRegistration | null> {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
-    return null;
-  }
-
-  await bootstrapServiceWorker();
-
-  const controlling = await waitForControllingServiceWorker(maxWaitMs);
-  if (controlling) return controlling;
-
-  const deadline = Date.now() + maxWaitMs;
-
-  while (Date.now() < deadline) {
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) break;
-
-    const registration = await getServiceWorkerRegistration();
-    if (registration) {
-      if (registration.active) return registration;
-      const activated = await waitForWorkerActivation(
-        registration,
-        Math.min(4_000, remaining)
-      );
-      if (activated) return activated;
-      if (registration.pushManager) return registration;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-
-  const last = await getServiceWorkerRegistration();
-  if (last?.pushManager) return last;
-  return null;
 }
 
 export type EnsurePushResult =
@@ -182,7 +92,7 @@ export async function ensureWebPushSubscription(
     };
   }
 
-  const swWaitMs = process.env.NODE_ENV === "development" ? 10_000 : 20_000;
+  const swWaitMs = 8_000;
   const registration = await waitForServiceWorkerRegistration(swWaitMs);
   if (!registration?.pushManager) {
     return {
@@ -358,7 +268,7 @@ export async function sendPushSubscription(subscription: PushSubscription): Prom
 
 /** Ré-enregistre l’abonnement navigateur sur le serveur (JWT requis). */
 export async function syncPushSubscriptionToServer(): Promise<void> {
-  const registration = await waitForServiceWorkerRegistration(20_000);
+  const registration = await waitForServiceWorkerRegistration(8_000);
   if (!registration?.pushManager) {
     throw new Error(serviceWorkerUnavailableMessage());
   }
@@ -429,7 +339,9 @@ export async function resyncPushAfterAuth(): Promise<void> {
   if (!getAccessToken()) return;
 
   try {
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await waitForServiceWorkerRegistration(8_000);
+    if (!registration?.pushManager) return;
+
     const existing = await registration.pushManager.getSubscription();
     if (!existing) {
       await ensureWebPushSubscription(false);

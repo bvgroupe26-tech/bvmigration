@@ -174,7 +174,9 @@ export default function PwaPushSettingsCard() {
           <p className="mt-1 text-sm text-slate-600">
             {isSubscribed
               ? "Vous recevrez les alertes RH même lorsque l'application est fermée."
-              : "Installez l'app et activez les notifications pour ne rien manquer."}
+              : permission === "granted"
+                ? "Permission accordée — finalisez l'enregistrement push sur cet appareil."
+                : "Installez l'app et activez les notifications pour ne rien manquer."}
           </p>
         </div>
       </div>
@@ -206,7 +208,11 @@ export default function PwaPushSettingsCard() {
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2F5F9D] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1F3F73] disabled:opacity-60"
         >
           <Bell className="h-4 w-4" />
-          {loading ? "Activation…" : "Activer les notifications"}
+          {loading
+            ? "Finalisation…"
+            : permission === "granted"
+              ? "Finaliser les notifications"
+              : "Activer les notifications"}
         </button>
       ) : serverRegistered === false ? (
         <div className="space-y-2">
