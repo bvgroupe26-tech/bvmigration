@@ -106,7 +106,6 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  turbopack: {},
   serverExternalPackages: ["better-sqlite3", "electron"],
   async rewrites() {
     const target = apiProxyTarget.replace(/\/$/, "");
