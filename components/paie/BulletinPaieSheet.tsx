@@ -40,39 +40,44 @@ export default function BulletinPaieSheet({
         className
       )}
     >
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-6 py-5 print:px-0 print:py-4">
+      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-6 py-5 print:gap-2 print:px-0 print:py-2">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">BV Groupe</p>
-          <h1 className="font-display text-xl font-bold tracking-tight text-slate-900 print:text-2xl">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 print:text-[9px]">BV Groupe</p>
+          <h1 className="font-display text-xl font-bold tracking-tight text-slate-900 print:text-lg">
             Bulletin de paie
           </h1>
-          <p className="mt-1 max-w-md text-xs text-slate-600">
+          <p className="bulletin-print-confidential mt-1 max-w-md text-xs text-slate-600">
             Document confidentiel — à conserver par l&apos;employé et le service paie.
           </p>
         </div>
         <div className="text-right">
           <p className="text-xs text-slate-500">Période de paie</p>
-          <p className="font-display text-lg font-bold text-slate-900">{moisLabel}</p>
-          {prorataLabel && <p className="mt-1 text-xs font-medium text-amber-800">{prorataLabel}</p>}
+          <p className="font-display text-lg font-bold text-slate-900 print:text-base">{moisLabel}</p>
+          {prorataLabel && <p className="mt-0.5 text-xs font-medium text-amber-800 print:text-[10px]">{prorataLabel}</p>}
           {showStatutBadge && (
             <div className="mt-2 flex justify-end print:hidden">
               <StatBadge variant={bulletin.statut}>{bulletin.statut.replace("_", " ")}</StatBadge>
             </div>
           )}
-          <p className="mt-2 hidden text-xs font-medium uppercase tracking-wide text-slate-600 print:block">
+          <p className="bulletin-print-statut mt-2 hidden text-xs font-medium uppercase tracking-wide text-slate-600 print:block">
             Statut : {bulletin.statut.replace("_", " ")}
           </p>
         </div>
       </header>
 
-      <section className="border-b border-slate-100 px-6 py-5 print:px-0 print:py-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <Avatar nom={bulletin.employe_nom ?? "?"} prenom={bulletin.employe_prenom ?? ""} size="lg" />
+      <section className="border-b border-slate-100 px-6 py-5 print:px-0 print:py-2">
+        <div className="flex flex-wrap items-center gap-4 print:gap-2">
+          <Avatar
+            nom={bulletin.employe_nom ?? "?"}
+            prenom={bulletin.employe_prenom ?? ""}
+            size="lg"
+            className="bulletin-print-avatar"
+          />
           <div className="min-w-0 flex-1">
-            <h2 className="truncate font-display text-lg font-bold text-slate-900">
+            <h2 className="truncate font-display text-lg font-bold text-slate-900 print:text-base">
               {bulletin.employe_prenom} {bulletin.employe_nom}
             </h2>
-            <dl className="mt-2 grid grid-cols-1 gap-x-8 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
+            <dl className="mt-1 grid grid-cols-1 gap-x-8 gap-y-0.5 text-xs text-slate-600 sm:grid-cols-2 print:mt-0.5">
               <div className="flex gap-2">
                 <dt className="shrink-0 text-slate-500">Matricule</dt>
                 <dd className="font-mono text-slate-900">{matricule}</dd>
@@ -86,14 +91,14 @@ export default function BulletinPaieSheet({
         </div>
       </section>
 
-      <section className="px-6 py-5 print:px-0 print:py-4">
-        <div className="overflow-x-auto rounded-xl border border-slate-200 print:border-slate-300">
+      <section className="px-6 py-5 print:px-0 print:py-2">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 print:rounded-none print:border-slate-300">
           <table className="bulletin-pro-table w-full min-w-[480px] border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-600 print:bg-white">
-                <th className="border-b border-slate-200 px-4 py-3">Libellé</th>
-                <th className="border-b border-slate-200 px-4 py-3 text-right">Montant (FCFA)</th>
-                <th className="hidden border-b border-slate-200 px-4 py-3 text-center print:table-cell sm:table-cell">
+                <th className="border-b border-slate-200 px-4 py-3 print:py-1.5">Libellé</th>
+                <th className="border-b border-slate-200 px-4 py-3 text-right print:py-1.5">Montant (FCFA)</th>
+                <th className="hidden border-b border-slate-200 px-4 py-3 text-center sm:table-cell print:hidden">
                   Sens
                 </th>
               </tr>
@@ -103,7 +108,7 @@ export default function BulletinPaieSheet({
                 <tr className="bg-amber-50/80 text-amber-900">
                   <td className="border-b border-slate-100 px-4 py-2.5 text-xs font-medium">{prorataLabel}</td>
                   <td className="border-b border-slate-100 px-4 py-2.5 text-right font-mono text-xs">—</td>
-                  <td className="hidden border-b border-slate-100 px-4 py-2.5 print:table-cell sm:table-cell" />
+                  <td className="hidden border-b border-slate-100 px-4 py-2.5 sm:table-cell print:hidden" />
                 </tr>
               )}
               <TGain label="Salaire de base" v={bulletin.salaire_base} />
@@ -114,7 +119,7 @@ export default function BulletinPaieSheet({
               <tr className="bg-slate-50 font-semibold print:bg-slate-50">
                 <td className="border-t border-slate-200 px-4 py-3">Total brut</td>
                 <td className="border-t border-slate-200 px-4 py-3 text-right font-mono">{brut.toLocaleString("fr-FR")}</td>
-                <td className="hidden border-t border-slate-200 px-4 py-3 text-center text-emerald-800 print:table-cell sm:table-cell">
+                <td className="hidden border-t border-slate-200 px-4 py-3 text-center text-emerald-800 sm:table-cell print:hidden">
                   Gain
                 </td>
               </tr>
@@ -126,7 +131,7 @@ export default function BulletinPaieSheet({
                 <td className="border-t border-slate-200 px-4 py-3 text-right font-mono text-red-700">
                   -{totalRetenues.toLocaleString("fr-FR")}
                 </td>
-                <td className="hidden border-t border-slate-200 px-4 py-3 text-center text-red-800 print:table-cell sm:table-cell">
+                <td className="hidden border-t border-slate-200 px-4 py-3 text-center text-red-800 sm:table-cell print:hidden">
                   Retenue
                 </td>
               </tr>
@@ -134,16 +139,16 @@ export default function BulletinPaieSheet({
           </table>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-end justify-between gap-4 rounded-xl border-2 border-emerald-200 bg-emerald-50/90 px-5 py-4 print:border-emerald-300 print:bg-emerald-50">
+        <div className="bulletin-print-net mt-6 flex flex-wrap items-end justify-between gap-4 rounded-xl border-2 border-emerald-200 bg-emerald-50/90 px-5 py-4 print:mt-3 print:border-emerald-300 print:bg-emerald-50">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-900">Net à payer</p>
-            <p className="mt-1 font-mono text-2xl font-bold text-emerald-900 print:text-3xl">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-900 print:text-[10px]">Net à payer</p>
+            <p className="mt-1 font-mono text-2xl font-bold text-emerald-900 print:mt-0.5 print:text-xl">
               {bulletin.salaire_net.toLocaleString("fr-FR")}{" "}
-              <span className="text-base font-semibold">FCFA</span>
+              <span className="text-base font-semibold print:text-sm">FCFA</span>
             </p>
           </div>
           {datePaiement && (
-            <div className="text-right text-sm">
+            <div className="text-right text-sm print:text-xs">
               <p className="text-xs text-emerald-800">Date de paiement</p>
               <p className="font-mono font-medium text-emerald-900">{datePaiement}</p>
             </div>
@@ -151,7 +156,7 @@ export default function BulletinPaieSheet({
         </div>
       </section>
 
-      <footer className="border-t border-slate-100 px-6 py-4 text-[10px] leading-relaxed text-slate-500 print:px-0 print:py-3">
+      <footer className="bulletin-print-footer border-t border-slate-100 px-6 py-4 text-[10px] leading-relaxed text-slate-500 print:px-0 print:py-2">
         <p>
           Document établi à partir des données saisies dans l&apos;application RH. Montants soumis à validation du
           service paie et à la réglementation applicable.
@@ -170,7 +175,7 @@ function TGain({ label, v }: { label: string; v: number }) {
     <tr>
       <td className="border-b border-slate-100 px-4 py-2.5">{label}</td>
       <td className="border-b border-slate-100 px-4 py-2.5 text-right font-mono">{v.toLocaleString("fr-FR")}</td>
-      <td className="hidden border-b border-slate-100 px-4 py-2.5 text-center text-xs text-emerald-800 print:table-cell sm:table-cell">
+      <td className="hidden border-b border-slate-100 px-4 py-2.5 text-center text-xs text-emerald-800 sm:table-cell print:hidden">
         Gain
       </td>
     </tr>
@@ -184,7 +189,7 @@ function TRet({ label, v }: { label: string; v: number }) {
       <td className="border-b border-slate-100 px-4 py-2.5 text-right font-mono text-red-700">
         {v > 0 ? `-${v.toLocaleString("fr-FR")}` : v.toLocaleString("fr-FR")}
       </td>
-      <td className="hidden border-b border-slate-100 px-4 py-2.5 text-center text-xs text-red-800 print:table-cell sm:table-cell">
+      <td className="hidden border-b border-slate-100 px-4 py-2.5 text-center text-xs text-red-800 sm:table-cell print:hidden">
         Retenue
       </td>
     </tr>

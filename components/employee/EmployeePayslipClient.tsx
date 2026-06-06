@@ -44,7 +44,7 @@ export default function EmployeePayslipClient({ params }: { params: Promise<{ id
   }
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-4 pb-8 print:space-y-0 print:pb-0">
       <div className="no-print flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/employee/documents"
