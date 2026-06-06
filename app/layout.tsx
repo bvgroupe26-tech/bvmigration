@@ -13,7 +13,6 @@ import PwaInstallPrompt from "@/components/pwa/PwaInstallPrompt";
 import { SwrOfflineConfig } from "@/components/pwa/SwrOfflineConfig";
 import OfflineBanner from "@/components/pwa/OfflineBanner";
 import PwaServiceWorkerBootstrap from "@/components/pwa/PwaServiceWorkerBootstrap";
-import RegisterServiceWorkerScript from "@/components/pwa/RegisterServiceWorkerScript";
 import SyncOnReconnect from "@/components/pwa/SyncOnReconnect";
 import "./globals.css";
 
@@ -81,7 +80,6 @@ export default function RootLayout({
         className="min-h-screen bg-slate-100 font-sans text-text-primary antialiased"
         suppressHydrationWarning
       >
-        <RegisterServiceWorkerScript />
         <OfflineBanner />
         <PwaServiceWorkerBootstrap />
         <PwaInstallProvider>

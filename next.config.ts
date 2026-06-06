@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 
-const OFFLINE_ASSETS_REVISION = "6";
+const OFFLINE_ASSETS_REVISION = "7";
 
 const withPWA = withPWAInit({
   dest: "public",
@@ -48,7 +48,6 @@ const withPWA = withPWAInit({
       { url: "/employee/documents", revision: OFFLINE_ASSETS_REVISION },
       { url: "/employee/profile", revision: OFFLINE_ASSETS_REVISION },
       { url: "/employee/notifications", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/employee/paie", revision: OFFLINE_ASSETS_REVISION },
     ],
     runtimeCaching: [
       {
