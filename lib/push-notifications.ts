@@ -1,10 +1,13 @@
 import { apiFetch } from "@/lib/apiClient";
 import { getAccessToken } from "@/lib/authClient";
 import { needsPwaInstallForPush } from "@/lib/push-device";
+import {
+  bootstrapServiceWorker,
+  waitForControllingServiceWorker,
+} from "@/lib/pwa-service-worker";
 import { isStandaloneMode } from "@/lib/pwa-install";
 
 const VAPID_ENV_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-const SW_PATH = "/sw.js";
 
 export const PUSH_BANNER_DISMISS_KEY = "bv-push-banner-dismissed";
 const PUSH_DISMISS_DAYS = 14;
@@ -101,18 +104,6 @@ async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration
   return registrations.find((reg) => reg.active) ?? registrations[0] ?? null;
 }
 
-async function ensureServiceWorkerRegistered(): Promise<ServiceWorkerRegistration | null> {
-  let registration = await getServiceWorkerRegistration();
-  if (registration) return registration;
-
-  try {
-    registration = await navigator.serviceWorker.register(SW_PATH, { scope: "/" });
-    return registration;
-  } catch {
-    return getServiceWorkerRegistration();
-  }
-}
-
 function serviceWorkerUnavailableMessage(): string {
   const devHint =
     process.env.NODE_ENV === "development"
@@ -137,7 +128,10 @@ export async function waitForServiceWorkerRegistration(
     return null;
   }
 
-  await ensureServiceWorkerRegistered();
+  await bootstrapServiceWorker();
+
+  const controlling = await waitForControllingServiceWorker(maxWaitMs);
+  if (controlling) return controlling;
 
   const deadline = Date.now() + maxWaitMs;
 
@@ -145,35 +139,23 @@ export async function waitForServiceWorkerRegistration(
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
 
-    try {
-      const ready = await raceTimeout(
-        navigator.serviceWorker.ready,
-        Math.min(3_000, remaining)
-      );
-      if (ready) {
-        const activated = await waitForWorkerActivation(ready, Math.min(4_000, remaining));
-        if (activated?.active) return activated;
-      }
-    } catch {
-      /* ignore */
-    }
-
     const registration = await getServiceWorkerRegistration();
     if (registration) {
+      if (registration.active) return registration;
       const activated = await waitForWorkerActivation(
         registration,
-        Math.min(3_000, remaining)
+        Math.min(4_000, remaining)
       );
-      if (activated?.active) return activated;
+      if (activated) return activated;
+      if (registration.pushManager) return registration;
     }
 
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
   const last = await getServiceWorkerRegistration();
-  if (!last) return null;
-  const activated = await waitForWorkerActivation(last, 2_000);
-  return activated?.active ? activated : null;
+  if (last?.pushManager) return last;
+  return null;
 }
 
 export type EnsurePushResult =
@@ -200,6 +182,16 @@ export async function ensureWebPushSubscription(
     };
   }
 
+  const swWaitMs = process.env.NODE_ENV === "development" ? 10_000 : 20_000;
+  const registration = await waitForServiceWorkerRegistration(swWaitMs);
+  if (!registration?.pushManager) {
+    return {
+      ok: false,
+      reason: "error",
+      message: serviceWorkerUnavailableMessage(),
+    };
+  }
+
   let permission = Notification.permission;
   if (permission === "default" && requestPermission) {
     permission = await requestNotificationPermission();
@@ -218,16 +210,6 @@ export async function ensureWebPushSubscription(
       ok: false,
       reason: "denied",
       message: "Autorisation des notifications requise.",
-    };
-  }
-
-  const swWaitMs = process.env.NODE_ENV === "development" ? 8_000 : 15_000;
-  const registration = await waitForServiceWorkerRegistration(swWaitMs);
-  if (!registration?.active) {
-    return {
-      ok: false,
-      reason: "error",
-      message: serviceWorkerUnavailableMessage(),
     };
   }
 
@@ -376,8 +358,8 @@ export async function sendPushSubscription(subscription: PushSubscription): Prom
 
 /** Ré-enregistre l’abonnement navigateur sur le serveur (JWT requis). */
 export async function syncPushSubscriptionToServer(): Promise<void> {
-  const registration = await waitForServiceWorkerRegistration(15_000);
-  if (!registration?.active) {
+  const registration = await waitForServiceWorkerRegistration(20_000);
+  if (!registration?.pushManager) {
     throw new Error(serviceWorkerUnavailableMessage());
   }
 

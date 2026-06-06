@@ -12,6 +12,7 @@ import ChunkLoadRecovery from "@/components/pwa/ChunkLoadRecovery";
 import PwaInstallPrompt from "@/components/pwa/PwaInstallPrompt";
 import { SwrOfflineConfig } from "@/components/pwa/SwrOfflineConfig";
 import OfflineBanner from "@/components/pwa/OfflineBanner";
+import PwaServiceWorkerBootstrap from "@/components/pwa/PwaServiceWorkerBootstrap";
 import SyncOnReconnect from "@/components/pwa/SyncOnReconnect";
 import "./globals.css";
 
@@ -80,6 +81,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <OfflineBanner />
+        <PwaServiceWorkerBootstrap />
         <PwaInstallProvider>
           <AuthProvider>
             <PushNotificationsProvider>

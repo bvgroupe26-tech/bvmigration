@@ -27,7 +27,7 @@ function isElectron(): boolean {
   return typeof window !== "undefined" && (window as Window & { electronAPI?: unknown }).electronAPI != null;
 }
 
-const SUBSCRIBE_TIMEOUT_MS = 22_000;
+const SUBSCRIBE_TIMEOUT_MS = 30_000;
 const PUSH_RESYNC_MESSAGE = "BV_PUSH_RESYNC";
 
 type PushNotificationsContextValue = {
