@@ -98,8 +98,10 @@ export default function RootLayout({
           <PwaInstallPrompt />
           <Toaster
             theme="light"
-            position="top-right"
+            position="bottom-center"
             richColors
+            offset={16}
+            mobileOffset={{ bottom: "calc(var(--shell-bottom-nav-height, 4rem) + env(safe-area-inset-bottom, 0px) + 0.5rem)" }}
             toastOptions={{
               style: {
                 background: "#ffffff",

@@ -59,7 +59,7 @@ export function PushNotificationsProvider({ children }: { children: ReactNode })
     }
 
     // next-pwa enregistre déjà /sw.js — on attend ready sans second register()
-    const reg = await waitForServiceWorkerRegistration(4_000);
+    const reg = await waitForServiceWorkerRegistration(8_000);
     if (!reg) {
       setIsSubscribed(false);
       return;

@@ -1,7 +1,10 @@
 import { apiFetch } from "@/lib/apiClient";
 import { getAccessToken } from "@/lib/authClient";
+import { needsPwaInstallForPush } from "@/lib/push-device";
+import { isStandaloneMode } from "@/lib/pwa-install";
 
 const VAPID_ENV_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+const SW_PATH = "/sw.js";
 
 export const PUSH_BANNER_DISMISS_KEY = "bv-push-banner-dismissed";
 const PUSH_DISMISS_DAYS = 14;
@@ -52,6 +55,81 @@ export async function withPushTimeout<T>(
 }
 
 /** Attend le SW enregistré par next-pwa (register: true) — sans second register(). */
+function waitForWorkerActivation(
+  registration: ServiceWorkerRegistration,
+  timeoutMs: number
+): Promise<ServiceWorkerRegistration | null> {
+  if (registration.active) return Promise.resolve(registration);
+
+  return new Promise((resolve) => {
+    const deadline = Date.now() + timeoutMs;
+    let worker = registration.installing || registration.waiting;
+
+    const finish = () => {
+      resolve(registration.active ? registration : null);
+    };
+
+    const attach = (sw: ServiceWorker) => {
+      const onStateChange = () => {
+        if (sw.state === "activated" || sw.state === "redundant") {
+          sw.removeEventListener("statechange", onStateChange);
+          finish();
+        }
+      };
+      sw.addEventListener("statechange", onStateChange);
+      if (sw.state === "activated") {
+        sw.removeEventListener("statechange", onStateChange);
+        finish();
+      }
+    };
+
+    if (worker) {
+      attach(worker);
+    } else {
+      void registration.update().catch(() => undefined);
+      worker = registration.installing || registration.waiting;
+      if (worker) attach(worker);
+    }
+
+    setTimeout(finish, Math.max(0, deadline - Date.now()));
+  });
+}
+
+async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  if (registrations.length === 0) return null;
+  return registrations.find((reg) => reg.active) ?? registrations[0] ?? null;
+}
+
+async function ensureServiceWorkerRegistered(): Promise<ServiceWorkerRegistration | null> {
+  let registration = await getServiceWorkerRegistration();
+  if (registration) return registration;
+
+  try {
+    registration = await navigator.serviceWorker.register(SW_PATH, { scope: "/" });
+    return registration;
+  } catch {
+    return getServiceWorkerRegistration();
+  }
+}
+
+function serviceWorkerUnavailableMessage(): string {
+  const devHint =
+    process.env.NODE_ENV === "development"
+      ? " En mode développement, testez avec « npm run build && npm run start » ou sur l'URL de production."
+      : "";
+
+  if (isStandaloneMode()) {
+    return `Service worker indisponible. Fermez complètement l'application, rouvrez-la depuis l'icône, puis réessayez.${devHint}`;
+  }
+
+  if (needsPwaInstallForPush()) {
+    return `Service worker indisponible. Installez l'application sur l'écran d'accueil, puis réessayez.${devHint}`;
+  }
+
+  return `Service worker indisponible. Rechargez la page ou installez l'application.${devHint}`;
+}
+
 export async function waitForServiceWorkerRegistration(
   maxWaitMs = 12_000
 ): Promise<ServiceWorkerRegistration | null> {
@@ -59,21 +137,43 @@ export async function waitForServiceWorkerRegistration(
     return null;
   }
 
+  await ensureServiceWorkerRegistered();
+
   const deadline = Date.now() + maxWaitMs;
-  const perWaitMs = Math.min(2_500, maxWaitMs);
 
   while (Date.now() < deadline) {
-    const ready = await raceTimeout(navigator.serviceWorker.ready, perWaitMs);
-    if (ready?.active) return ready;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
 
-    const reg = await navigator.serviceWorker.getRegistration("/");
-    if (reg?.active) return reg;
+    try {
+      const ready = await raceTimeout(
+        navigator.serviceWorker.ready,
+        Math.min(3_000, remaining)
+      );
+      if (ready) {
+        const activated = await waitForWorkerActivation(ready, Math.min(4_000, remaining));
+        if (activated?.active) return activated;
+      }
+    } catch {
+      /* ignore */
+    }
 
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    const registration = await getServiceWorkerRegistration();
+    if (registration) {
+      const activated = await waitForWorkerActivation(
+        registration,
+        Math.min(3_000, remaining)
+      );
+      if (activated?.active) return activated;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
 
-  const last = await navigator.serviceWorker.getRegistration("/");
-  return last?.active ? last : null;
+  const last = await getServiceWorkerRegistration();
+  if (!last) return null;
+  const activated = await waitForWorkerActivation(last, 2_000);
+  return activated?.active ? activated : null;
 }
 
 export type EnsurePushResult =
@@ -92,7 +192,6 @@ export async function ensureWebPushSubscription(
     return { ok: false, reason: "unsupported", message: "Navigateur incompatible avec les notifications push" };
   }
 
-  const { needsPwaInstallForPush } = await import("@/lib/push-device");
   if (needsPwaInstallForPush()) {
     return {
       ok: false,
@@ -122,17 +221,13 @@ export async function ensureWebPushSubscription(
     };
   }
 
-  const swWaitMs = process.env.NODE_ENV === "development" ? 5_000 : 10_000;
+  const swWaitMs = process.env.NODE_ENV === "development" ? 8_000 : 15_000;
   const registration = await waitForServiceWorkerRegistration(swWaitMs);
   if (!registration?.active) {
-    const devHint =
-      process.env.NODE_ENV === "development"
-        ? " En mode développement, testez avec « npm run build && npm run start » ou sur l'URL de production."
-        : "";
     return {
       ok: false,
       reason: "error",
-      message: `Service worker indisponible. Rechargez la page ou installez l'application.${devHint}`,
+      message: serviceWorkerUnavailableMessage(),
     };
   }
 
@@ -281,9 +376,9 @@ export async function sendPushSubscription(subscription: PushSubscription): Prom
 
 /** Ré-enregistre l’abonnement navigateur sur le serveur (JWT requis). */
 export async function syncPushSubscriptionToServer(): Promise<void> {
-  const registration = await waitForServiceWorkerRegistration(12_000);
+  const registration = await waitForServiceWorkerRegistration(15_000);
   if (!registration?.active) {
-    throw new Error("Service worker indisponible — rechargez l'application.");
+    throw new Error(serviceWorkerUnavailableMessage());
   }
 
   const subscription = await registration.pushManager.getSubscription();
