@@ -66,25 +66,38 @@ export default function PushNotificationBanner({
     ? "Activation…"
     : failedOnce
       ? "Réessayer"
-      : "Activer les notifications";
+      : "Activer";
 
   return (
     <div
       role="region"
       aria-label="Activer les notifications push"
       className={cn(
-        "sticky top-0 z-[9990] border-b border-[#1F3F73]/15 bg-gradient-to-r from-[#1F3F73] to-[#2F5F9D] px-4 py-3 text-white shadow-md no-print",
+        "overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/[0.04] no-print",
         className
       )}
     >
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 sm:flex-nowrap">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15">
-            <Bell className="h-4 w-4" aria-hidden />
+      <div className="h-0.5 bg-gradient-to-r from-[#1F3F73] via-[#2F5F9D] to-[#F2C94C]" />
+
+      <div className="relative p-4">
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          aria-label="Ignorer"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="flex items-start gap-3 pr-8">
+          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#E8F0FA] text-[#1F3F73] ring-1 ring-[#2F5F9D]/10">
+            <Bell className="h-5 w-5" aria-hidden />
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-semibold leading-snug">Notifications en temps réel</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-white/80">
+            <p className="font-display text-sm font-bold leading-snug text-[#1F3F73]">
+              Notifications en temps réel
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600">
               {needsInstallFirst
                 ? "Sur iPhone, installez l'app sur l'écran d'accueil pour recevoir les alertes même fermée."
                 : "Recevez les alertes RH sur votre appareil, même quand l'application est fermée."}
@@ -92,25 +105,24 @@ export default function PushNotificationBanner({
           </div>
         </div>
 
-        <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+        <div className="mt-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            Plus tard
+          </button>
           {!needsInstallFirst ? (
             <button
               type="button"
               onClick={() => void handleSubscribe()}
               disabled={activating}
-              className="inline-flex min-w-[10.5rem] flex-1 items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#1F3F73] transition hover:bg-white/90 disabled:opacity-70 sm:flex-none"
+              className="inline-flex flex-[1.2] items-center justify-center rounded-xl bg-[#1F3F73] px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#2F5F9D] disabled:opacity-70"
             >
               {buttonLabel}
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={handleDismiss}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
-            aria-label="Ignorer"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
       </div>
     </div>
