@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Download, Eye, FileText, Printer, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import {
   useMyDocuments,
   useMyPayslips,
   downloadDocument,
-  openPayslipPrint,
 } from "@/hooks/employee";
 import { formatMonthYear } from "@/lib/employee/utils";
 import { formatProrata } from "@/lib/paie-utils";
@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 type Tab = "documents" | "paie";
 
 export default function EmployeeDocumentsClient() {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("documents");
   const { documents, isLoading: loadingDocs, error: docsError } = useMyDocuments();
   const { payslips, isLoading: loadingPaie, error: paieError } = useMyPayslips();
@@ -38,9 +39,8 @@ export default function EmployeeDocumentsClient() {
     }
   }
 
-  async function handlePaiePrint(id: number) {
-    openPayslipPrint(id);
-    toast.success("Ouverture pour impression ou enregistrement PDF");
+  function handlePaiePrint(id: number) {
+    router.push(`/employee/paie/${id}?print=1`);
   }
 
   return (

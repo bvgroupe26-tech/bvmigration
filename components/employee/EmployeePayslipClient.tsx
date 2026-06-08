@@ -6,30 +6,42 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Printer, Wallet } from "lucide-react";
 import BulletinPaieSheet from "@/components/paie/BulletinPaieSheet";
 import { EmployeeEmpty, EmployeeError, EmployeeLoading } from "@/components/employee/EmployeeState";
-import { useEmployeMe, useMyPayslips } from "@/hooks/employee";
+import { useEmployeMe, useMyPayslip } from "@/hooks/employee";
 import { formatMoisPaie } from "@/lib/absence-utils";
 import type { Paie } from "@/lib/types";
 
 export default function EmployeePayslipClient({ params }: { params: Promise<{ id: string }> }) {
   const { id: idParam } = use(params);
   const id = Number(idParam);
+  const validId = Number.isFinite(id) && id > 0 ? id : null;
   const searchParams = useSearchParams();
   const autoPrint = searchParams.get("print") === "1";
 
-  const { payslips, isLoading, error } = useMyPayslips();
+  const { bulletin: rawBulletin, isLoading, error } = useMyPayslip(validId);
   const { employe } = useEmployeMe();
 
   const bulletin = useMemo(() => {
-    const found = payslips.find((p) => p.id === id);
-    if (!found) return null;
-    return enrichBulletinWithEmploye(found, employe);
-  }, [payslips, id, employe]);
+    if (!rawBulletin) return null;
+    if (rawBulletin.statut !== "paye") return null;
+    if (employe && rawBulletin.employe_id && rawBulletin.employe_id !== employe.id) return null;
+    return enrichBulletinWithEmploye(rawBulletin, employe);
+  }, [rawBulletin, employe]);
 
   useEffect(() => {
     if (!autoPrint || !bulletin) return;
-    const timer = window.setTimeout(() => window.print(), 400);
+    const timer = window.setTimeout(() => window.print(), 800);
     return () => window.clearTimeout(timer);
   }, [autoPrint, bulletin]);
+
+  if (!validId) {
+    return (
+      <EmployeeEmpty
+        icon={Wallet}
+        title="Bulletin invalide"
+        description="L'identifiant du bulletin est incorrect."
+      />
+    );
+  }
 
   if (isLoading) return <EmployeeLoading />;
   if (error) return <EmployeeError message="Impossible de charger ce bulletin." />;
@@ -38,7 +50,7 @@ export default function EmployeePayslipClient({ params }: { params: Promise<{ id
       <EmployeeEmpty
         icon={Wallet}
         title="Bulletin introuvable"
-        description="Ce bulletin n'existe pas ou n'est pas encore disponible."
+        description="Ce bulletin n'existe pas, n'est pas encore payé ou ne vous est pas accessible."
       />
     );
   }

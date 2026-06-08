@@ -60,6 +60,14 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
+  // Lien RH / notification / push vers /paie/:id → espace employé (évite renvoi à l'accueil).
+  const paieDetailMatch = pathname.match(/^\/paie\/(\d+)$/);
+  if (role === "employee" && paieDetailMatch) {
+    const target = new URL(`/employee/paie/${paieDetailMatch[1]}`, req.url);
+    target.search = req.nextUrl.search;
+    return NextResponse.redirect(target);
+  }
+
   if (!pathname.startsWith("/employee") && role === "employee" && pathname !== "/") {
     return NextResponse.redirect(new URL("/employee/dashboard", req.url));
   }

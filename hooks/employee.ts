@@ -30,7 +30,7 @@ import type {
   EmployeMe,
   UserMePayload,
 } from "@/lib/employee/types";
-import { normalizePaieList } from "@/lib/paie-utils";
+import { normalizePaie, normalizePaieList } from "@/lib/paie-utils";
 import { normalizePresenceList } from "@/lib/presence-utils";
 import type { Paie, Presence } from "@/lib/types";
 
@@ -75,6 +75,16 @@ export function useMyPayslips() {
     SHORT
   );
   return { payslips: data ?? [], isLoading, error, mutate };
+}
+
+export function useMyPayslip(id: number | null) {
+  const validId = id != null && Number.isFinite(id) && id > 0 ? id : null;
+  const { data, error, isLoading, mutate } = useSWR<Paie>(
+    validId ? `/paie/${validId}` : null,
+    async (key: string) => normalizePaie(await fetcher<unknown>(key)),
+    SHORT
+  );
+  return { bulletin: data, isLoading, error, mutate };
 }
 
 export function useMyPresences(filters?: {
@@ -152,8 +162,10 @@ export async function cancelAbsence(id: number) {
   return apiDelete<void>(`/absences/${id}`);
 }
 
+/** Même onglet : fiable en PWA mobile (pas de popup bloquée, session partagée). */
 export function openPayslipPrint(id: number) {
-  window.open(`/employee/paie/${id}?print=1`, "_blank", "noopener,noreferrer");
+  if (typeof window === "undefined") return;
+  window.location.assign(`/employee/paie/${id}?print=1`);
 }
 
 export async function downloadDocument(id: number, name?: string) {

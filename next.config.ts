@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 
-const OFFLINE_ASSETS_REVISION = "7";
+const OFFLINE_ASSETS_REVISION = "8";
 
 const withPWA = withPWAInit({
   dest: "public",
@@ -11,7 +11,8 @@ const withPWA = withPWAInit({
   customWorkerSrc: "worker",
   customWorkerDest: "public",
   cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
+  /** Désactivé : évite de servir une mauvaise page HTML en cache sur les routes dynamiques (/employee/paie/:id). */
+  aggressiveFrontEndNavCaching: false,
   reloadOnOnline: true,
   extendDefaultRuntimeCaching: true,
   fallbacks: {
@@ -27,6 +28,8 @@ const withPWA = withPWAInit({
       /^\/manifest\.webmanifest$/,
       /^\/icons\//,
       /^\/favicon/,
+      /^\/employee\/paie\//,
+      /^\/paie\/\d+/,
       /\/.*\.[a-zA-Z0-9]+$/,
     ],
     additionalManifestEntries: [
