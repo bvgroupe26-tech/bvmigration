@@ -18,6 +18,8 @@ import { Field, Input, NativeSelect } from "@/components/ui/Field";
 import MoneyInput from "@/components/ui/MoneyInput";
 import Button from "@/components/ui/Button";
 import type { Employe } from "@/lib/types";
+import { normalizeEmploye } from "@/lib/employe-utils";
+import { prepareEmployeApiPayload } from "@/lib/employe-payload";
 import { usePostes } from "@/hooks/usePostes";
 
 const DEPARTEMENT_SUGGESTIONS = [
@@ -39,15 +41,6 @@ type EmployeFormProps = {
 };
 
 type FormData = RegisterEmployeeInput;
-
-function snakeToCamel(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-    result[camelKey] = value;
-  }
-  return result;
-}
 
 export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFormProps) {
   const isEdit = !!employe;
@@ -108,7 +101,8 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
       departement: employe.departement ?? "",
       type_contrat: (employe.type_contrat ?? "CDI") as EmployeInput["type_contrat"],
       salaire_base: employe.salaire_base,
-      date_embauche: employe.date_embauche ?? "",
+      date_embauche:
+        employe.date_embauche ?? new Date().toISOString().slice(0, 10),
       date_fin_contrat:
         employe.date_fin_contrat ??
         (employe as { dateFinContrat?: string | null }).dateFinContrat ??
@@ -127,7 +121,7 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
 
   const statut = watch("statut");
   const posteValue = watch("poste");
-  const { postes } = usePostes();
+  const { postes, isLoading: loadingPostes } = usePostes();
   const posteOptions = useMemo(() => {
     const labels = new Set(postes);
     const current = typeof posteValue === "string" ? posteValue.trim() : "";
@@ -139,27 +133,30 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
     try {
       if (isEdit) {
         const { password: _p, password_confirm: _pc, ...employeData } = data;
-        const result = await apiClient.put<Employe>(
+        const raw = await apiClient.put<unknown>(
           `/employes/${employe.id}`,
-          snakeToCamel(employeData as Record<string, unknown>)
+          prepareEmployeApiPayload(employeData)
         );
+        const result = normalizeEmploye(raw);
         toast.success(`${result.prenom} ${result.nom} mis à jour`);
         onSuccess?.(result);
       } else if (withAccount) {
         const { password_confirm: _pc, ...rest } = data;
-        const payload = snakeToCamel({
-          email: rest.email,
+        const payload = {
+          ...prepareEmployeApiPayload({
+            email: rest.email,
+            nom: rest.nom,
+            prenom: rest.prenom,
+            telephone: rest.telephone,
+            adresse: rest.adresse,
+            poste: rest.poste,
+            departement: rest.departement,
+            type_contrat: rest.type_contrat,
+            date_embauche: rest.date_embauche,
+            salaire_base: rest.salaire_base,
+          }),
           password: rest.password,
-          nom: rest.nom,
-          prenom: rest.prenom,
-          telephone: rest.telephone,
-          adresse: rest.adresse,
-          poste: rest.poste,
-          departement: rest.departement,
-          type_contrat: rest.type_contrat,
-          date_embauche: rest.date_embauche,
-          salaire_base: rest.salaire_base,
-        });
+        };
         const resp = await apiFetch<{
           user: { nom: string; prenom: string; employeId?: number | null };
         }>(
@@ -185,10 +182,11 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
         }
       } else {
         const { password: _p, password_confirm: _pc, ...employeData } = data;
-        const result = await apiClient.post<Employe>(
+        const raw = await apiClient.post<unknown>(
           "/employes",
-          snakeToCamel(employeData as Record<string, unknown>)
+          prepareEmployeApiPayload(employeData)
         );
+        const result = normalizeEmploye(raw);
         toast.success(`${result.prenom} ${result.nom} ajouté(e)`);
         onSuccess?.(result);
       }
@@ -308,14 +306,26 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Poste" required error={errors.poste?.message}>
-          <NativeSelect {...register("poste")} defaultValue="">
-            <option value="">— Choisir un poste —</option>
-            {posteOptions.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </NativeSelect>
+          <Controller
+            name="poste"
+            control={control}
+            render={({ field }) => (
+              <NativeSelect
+                {...field}
+                value={field.value ?? ""}
+                disabled={loadingPostes}
+              >
+                <option value="">
+                  {loadingPostes ? "Chargement des postes…" : "— Choisir un poste —"}
+                </option>
+                {posteOptions.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </NativeSelect>
+            )}
+          />
           <p className="text-[11px] text-slate-500">
             <Link href="/employes/postes" className="font-medium text-[#2F5F9D] hover:text-[#1F3F73]">
               Gérer le référentiel des postes

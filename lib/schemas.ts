@@ -97,7 +97,10 @@ export const employeSchema = z.object({
   nom: z.string().min(2, "Nom requis"),
   prenom: z.string().min(2, "Prénom requis"),
   email: z.string().min(1, "Email requis").email("Email invalide"),
-  telephone: z.string().min(6, "Téléphone requis (min. 6 caractères)"),
+  telephone: z.union([
+    z.string().min(6, "Téléphone requis (min. 6 caractères)"),
+    z.literal(""),
+  ]),
   date_naissance: z.string().optional().or(z.literal("")),
   adresse: z.string().optional().or(z.literal("")),
   situation_familiale: z.enum(["celibataire", "marie", "divorce", "veuf"]).optional().or(z.literal("")),
@@ -108,7 +111,7 @@ export const employeSchema = z.object({
     .string()
     .min(1, "Type de contrat requis")
     .pipe(z.enum(["CDI", "CDD", "Stage", "Freelance", "Interim"])),
-  salaire_base: z.coerce.number().positive("Salaire de base requis (montant > 0)"),
+  salaire_base: montantFcfaNonNegatif(),
   date_embauche: z.string().min(8, "Date d'embauche requise"),
   date_fin_contrat: z.string().optional().or(z.literal("")),
   statut: z.enum(["actif", "inactif", "suspendu"]).default("actif"),
