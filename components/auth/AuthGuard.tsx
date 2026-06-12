@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { getHomeRouteByRole, normalizeAppRole } from "@/lib/session";
+import { canRoleAccessPath, hasEmployeePanelAccess, hasAdminPanelAccess } from "@/lib/roles";
+import AccessDeniedHelp from "@/components/auth/AccessDeniedHelp";
 import AuthLoading from "@/components/auth/AuthLoading";
 
 type AuthGuardProps = {
@@ -12,11 +14,34 @@ type AuthGuardProps = {
   redirectTo?: string;
 };
 
-function roleAllowed(userRole: string | undefined, allowedRoles?: string[]): boolean {
+function roleAllowed(
+  userRole: string | undefined,
+  allowedRoles: string[] | undefined,
+  employeId?: number | null
+): boolean {
   if (!allowedRoles?.length) return true;
   const normalized = normalizeAppRole(userRole);
   if (!normalized) return false;
-  return allowedRoles.includes(normalized);
+  if (allowedRoles.includes(normalized)) return true;
+  // RH / manager / admin rattaché à une fiche employé → espace /employee
+  if (
+    allowedRoles.includes("employee") &&
+    hasEmployeePanelAccess(normalized, employeId) &&
+    hasAdminPanelAccess(normalized)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isPathMatch(pathname: string, target: string): boolean {
+  return pathname === target || pathname.startsWith(`${target}/`);
+}
+
+/** Navigation complète : fiable sur mobile / PWA lors d'un changement de zone (admin ↔ employé). */
+function hardNavigate(path: string): void {
+  if (typeof window === "undefined") return;
+  window.location.assign(path);
 }
 
 export default function AuthGuard({ children, allowedRoles, redirectTo }: AuthGuardProps) {
@@ -25,7 +50,9 @@ export default function AuthGuard({ children, allowedRoles, redirectTo }: AuthGu
   const pathname = usePathname() || "/";
   const redirectedRef = useRef(false);
 
-  const hasAccess = roleAllowed(user?.role, allowedRoles);
+  const hasAccess = roleAllowed(user?.role, allowedRoles, user?.employeId);
+  const userHome = user ? getHomeRouteByRole(user.role) : "/login";
+  const crossZoneTarget = redirectTo || userHome;
 
   useEffect(() => {
     redirectedRef.current = false;
@@ -34,15 +61,43 @@ export default function AuthGuard({ children, allowedRoles, redirectTo }: AuthGu
   useEffect(() => {
     if (isLoading || !isAuthenticated || !user || hasAccess) return;
 
-    const target = redirectTo || getHomeRouteByRole(user.role);
-    if (pathname === target || pathname.startsWith(`${target}/`)) {
+    // Bonne route pour le rôle, mauvais layout encore monté (transition Next.js / PWA).
+    if (canRoleAccessPath(user.role, pathname, user.employeId)) {
+      hardNavigate(pathname);
+      return;
+    }
+
+    // Cible de redirection atteinte sans accès : forcer l'accueil du rôle.
+    if (isPathMatch(pathname, crossZoneTarget)) {
+      if (!isPathMatch(pathname, userHome)) {
+        hardNavigate(userHome);
+        return;
+      }
+      hardNavigate(userHome);
       return;
     }
 
     if (redirectedRef.current) return;
     redirectedRef.current = true;
-    router.replace(target);
-  }, [allowedRoles, hasAccess, isAuthenticated, isLoading, pathname, redirectTo, router, user]);
+
+    // Changement de zone : navigation complète plutôt que router.replace (Safari / PWA).
+    if (crossZoneTarget.startsWith("/employee") !== pathname.startsWith("/employee")) {
+      hardNavigate(crossZoneTarget);
+      return;
+    }
+
+    router.replace(crossZoneTarget);
+  }, [
+    crossZoneTarget,
+    hasAccess,
+    isAuthenticated,
+    isLoading,
+    pathname,
+    redirectTo,
+    router,
+    user,
+    userHome,
+  ]);
 
   if (isLoading) {
     return <AuthLoading />;
@@ -53,16 +108,8 @@ export default function AuthGuard({ children, allowedRoles, redirectTo }: AuthGu
   }
 
   if (!hasAccess) {
-    const target = redirectTo || getHomeRouteByRole(user.role);
-    if (pathname === target || pathname.startsWith(`${target}/`)) {
-      return (
-        <div className="flex min-h-[100dvh] items-center justify-center bg-[#F4F7FB] p-6">
-          <p className="max-w-md text-center text-sm text-slate-600">
-            Votre profil ({user.role || "inconnu"}) n&apos;a pas accès à cette section. Contactez
-            l&apos;administrateur RH.
-          </p>
-        </div>
-      );
+    if (normalizeAppRole(user.role) === "employee" && !pathname.startsWith("/employee")) {
+      return <AccessDeniedHelp role={user.role} pathname={pathname} />;
     }
     return <AuthLoading />;
   }

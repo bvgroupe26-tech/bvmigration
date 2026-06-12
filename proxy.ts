@@ -56,7 +56,15 @@ export function proxy(req: NextRequest) {
 
   const role = parseRoleFromToken(legacyToken);
 
-  if (pathname.startsWith("/employee") && role && role !== "employee") {
+  // Espace employé : réservé aux employés et au staff RH/manager/admin (souvent aussi fiches employé).
+  if (
+    pathname.startsWith("/employee") &&
+    role &&
+    role !== "employee" &&
+    role !== "admin" &&
+    role !== "manager" &&
+    role !== "rh"
+  ) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

@@ -10,6 +10,7 @@ import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getUserErrorMessage } from "@/lib/apiClient";
 import { getHomeRouteByRole } from "@/lib/session";
+import { canRoleAccessPath } from "@/lib/roles";
 import Button from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
 
@@ -46,7 +47,10 @@ export default function LoginForm() {
     try {
       const profile = await login(data);
       const roleHome = getHomeRouteByRole(profile?.role);
-      const target = safeRedirect || roleHome;
+      const target =
+        safeRedirect && canRoleAccessPath(profile?.role, safeRedirect, profile?.employeId)
+          ? safeRedirect
+          : roleHome;
       toast.success("Connexion réussie");
       // Navigation complète : évite les blocages de session sur mobile (PWA / Safari).
       window.location.assign(target);

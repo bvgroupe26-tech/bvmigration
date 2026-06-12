@@ -5,11 +5,21 @@ const ADMIN_ROLES: AppRole[] = ["admin", "manager", "rh"];
 /** Rôle API / JWT → clé interne (évite blocage AuthGuard si casse différente). */
 export function normalizeAppRole(role?: string | null): AppRole | null {
   if (!role || typeof role !== "string") return null;
-  const key = role.trim().toLowerCase();
-  if (key === "employee" || key === "employe" || key === "employé") return "employee";
+  const key = role.trim().toLowerCase().replace(/^role_/, "");
+  if (key === "employee" || key === "employe" || key === "employé" || key === "employée") {
+    return "employee";
+  }
   if (key === "admin" || key === "administrator" || key === "superadmin") return "admin";
   if (key === "manager" || key === "gestionnaire") return "manager";
-  if (key === "rh" || key === "hr" || key === "ressources_humaines") return "rh";
+  if (
+    key === "rh" ||
+    key === "hr" ||
+    key === "ressources_humaines" ||
+    key === "ressources humaines" ||
+    key === "ressources-humaines"
+  ) {
+    return "rh";
+  }
   return null;
 }
 

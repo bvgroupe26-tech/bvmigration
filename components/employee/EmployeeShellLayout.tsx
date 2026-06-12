@@ -12,7 +12,7 @@ export default function EmployeeShellLayout({
   if (!user) return null;
 
   return (
-    <AuthGuard allowedRoles={["employee"]} redirectTo="/dashboard">
+    <AuthGuard allowedRoles={["employee", "admin", "manager", "rh"]} redirectTo="/dashboard">
       <EmployeeMobileShell
         user={{
           prenom: user.prenom,

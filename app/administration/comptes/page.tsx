@@ -96,6 +96,17 @@ export default function AdministrationComptesPage() {
         </GlassCard>
         )}
 
+        <GlassCard className="border-amber-200/80 bg-amber-50/50 p-4">
+          <p className="text-sm font-semibold text-amber-950">RH aussi salarié(e) de l&apos;entreprise</p>
+          <p className="mt-1 text-sm text-amber-900/90">
+            La masse salariale est calculée depuis la <strong>fiche employé</strong> (module Employés),
+            pas depuis le rôle de connexion. Gardez le rôle <strong>RH</strong> pour le panneau
+            d&apos;administration, et assurez-vous que la personne a une fiche employé avec salaire
+            (création sans compte « Fiche RH uniquement »). Si le rôle a été mis à « Employé » par
+            erreur, remettez <strong>RH</strong> ici — la paie reste liée à la fiche employé.
+          </p>
+        </GlassCard>
+
         <p className="text-xs text-slate-500">
           Panneau administration accessible aux rôles :{" "}
           {ADMIN_PANEL_ROLES.map((r) => ROLE_LABELS[r]).join(", ")}. Les comptes « Employé » utilisent

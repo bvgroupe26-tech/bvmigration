@@ -227,6 +227,15 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
         </div>
       )}
 
+      {!isEdit && withAccount ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-950">
+          <strong>Membre RH ou manager ?</strong> Ne créez pas le compte ici (rôle « Employé »
+          uniquement). Créez d&apos;abord la <strong>fiche RH sans compte</strong>, puis le compte
+          dans <strong>Administration → Comptes</strong> avec le rôle RH. La fiche suffit pour inclure
+          le salaire dans la masse salariale.
+        </p>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Prénom" required error={errors.prenom?.message}>
           <Input placeholder="Jean" {...register("prenom")} />

@@ -25,6 +25,37 @@ export function hasAdminPanelAccess(role?: string | null): boolean {
   return normalized !== null && ADMIN_PANEL_ROLES.includes(normalized);
 }
 
+export function isEmployeePath(pathname: string): boolean {
+  return pathname === "/employee" || pathname.startsWith("/employee/");
+}
+
+/** Accès à l'espace employé (/employee) : employés + staff (RH, manager, admin). */
+export function hasEmployeePanelAccess(
+  role?: string | null,
+  _employeId?: number | null
+): boolean {
+  const normalized = normalizeAppRole(role);
+  if (!normalized) return false;
+  if (normalized === "employee") return true;
+  return hasAdminPanelAccess(normalized);
+}
+
+/** Rôles autorisés sur les layouts /employee (AuthGuard). */
+export const EMPLOYEE_PANEL_ROLES: AppRole[] = ["employee", "admin", "manager", "rh"];
+
+/** Vérifie si un rôle peut accéder à une route (hors pages publiques). */
+export function canRoleAccessPath(
+  role: string | null | undefined,
+  pathname: string,
+  employeId?: number | null
+): boolean {
+  if (pathname === "/" || pathname === "/login" || pathname === "/offline") return true;
+  const normalized = normalizeAppRole(role);
+  if (!normalized) return false;
+  if (isEmployeePath(pathname)) return hasEmployeePanelAccess(normalized, employeId);
+  return hasAdminPanelAccess(normalized);
+}
+
 /** Qui peut créer quel rôle de compte staff. */
 export function canCreateStaffRole(
   creatorRole: string | null | undefined,
