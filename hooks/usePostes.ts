@@ -1,49 +1,53 @@
 "use client";
 
-import { useCallback } from "react";
-import useSWR from "swr";
-import { apiClient, fetcher } from "@/lib/fetcher";
-import { getUserErrorMessage } from "@/lib/apiClient";
-
-function normalizePostes(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter((item) => item.length >= 2)
-    .sort((a, b) => a.localeCompare(b, "fr"));
-}
+import { useCallback, useEffect, useState } from "react";
+import {
+  addStoredPoste,
+  mergePostesFromStrings,
+  readStoredPostes,
+  removeStoredPoste,
+} from "@/lib/postes-referentiel";
+import { useEmployes } from "@/hooks/api";
 
 export function usePostes() {
-  const { data, error, isLoading, mutate } = useSWR<string[]>(
-    "/employes/postes/referentiel",
-    async (url: string) => normalizePostes(await fetcher<unknown>(url)),
-    { revalidateOnFocus: true }
-  );
+  const [postes, setPostes] = useState<string[]>([]);
+  const [ready, setReady] = useState(false);
+  const { employes, isLoading: loadingEmployes } = useEmployes({ limit: 500 });
 
-  const addPoste = useCallback(
-    async (label: string) => {
-      const next = await apiClient.post<string[]>("/employes/postes/referentiel", { label });
-      await mutate(normalizePostes(next), { revalidate: false });
-      return normalizePostes(next);
-    },
-    [mutate]
-  );
+  const refresh = useCallback(() => {
+    setPostes(readStoredPostes());
+    setReady(true);
+  }, []);
 
-  const removePoste = useCallback(
-    async (label: string) => {
-      const next = await apiClient.post<string[]>("/employes/postes/referentiel/remove", { label });
-      await mutate(normalizePostes(next), { revalidate: false });
-      return normalizePostes(next);
-    },
-    [mutate]
-  );
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!employes.length) return;
+    const merged = mergePostesFromStrings(employes.map((e) => e.poste));
+    setPostes(merged);
+    setReady(true);
+  }, [employes]);
+
+  const addPoste = useCallback((label: string) => {
+    const next = addStoredPoste(label);
+    setPostes(next);
+    return next;
+  }, []);
+
+  const removePoste = useCallback((label: string) => {
+    const next = removeStoredPoste(label);
+    setPostes(next);
+    return next;
+  }, []);
 
   return {
-    postes: data ?? [],
-    isLoading,
-    error: error ? getUserErrorMessage(error) : null,
+    postes,
+    isLoading: !ready || loadingEmployes,
+    error: null as string | null,
     addPoste,
     removePoste,
-    refresh: mutate,
+    refresh,
   };
 }

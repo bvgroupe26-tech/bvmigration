@@ -9,14 +9,11 @@ import Button from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
 import Skeleton from "@/components/ui/Skeleton";
 import { usePostes } from "@/hooks/usePostes";
-import { getUserErrorMessage } from "@/lib/apiClient";
-
 export default function PostesReferentielClient() {
   const { postes, isLoading, error, addPoste, removePoste } = usePostes();
   const [label, setLabel] = useState("");
-  const [busy, setBusy] = useState(false);
 
-  async function handleAdd(e: React.FormEvent) {
+  function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     const value = label.trim();
     if (value.length < 2) {
@@ -27,28 +24,14 @@ export default function PostesReferentielClient() {
       toast.error("Ce poste existe déjà.");
       return;
     }
-    setBusy(true);
-    try {
-      await addPoste(value);
-      setLabel("");
-      toast.success("Poste ajouté");
-    } catch (err) {
-      toast.error(getUserErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
+    addPoste(value);
+    setLabel("");
+    toast.success("Poste ajouté");
   }
 
-  async function handleRemove(name: string) {
-    setBusy(true);
-    try {
-      await removePoste(name);
-      toast.success("Poste retiré du référentiel");
-    } catch (err) {
-      toast.error(getUserErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
+  function handleRemove(name: string) {
+    removePoste(name);
+    toast.success("Poste retiré du référentiel");
   }
 
   return (
@@ -66,8 +49,8 @@ export default function PostesReferentielClient() {
           Référentiel des postes
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">
-          Liste partagée en base de données, utilisée lors de la création d&apos;employés.
-          Les postes déjà renseignés sur les fiches existantes sont importés automatiquement.
+          Intitulés utilisés lors de l&apos;ajout d&apos;employés. Les postes déjà présents sur les
+          fiches existantes sont fusionnés automatiquement dans cette liste.
         </p>
       </div>
 
@@ -78,14 +61,12 @@ export default function PostesReferentielClient() {
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Ex. Responsable logistique"
-              disabled={busy}
             />
           </Field>
           <Button
             type="submit"
             variant="primary"
             icon={<Plus className="h-4 w-4" />}
-            loading={busy}
           >
             Ajouter
           </Button>
@@ -130,8 +111,7 @@ export default function PostesReferentielClient() {
                 </div>
                 <button
                   type="button"
-                  disabled={busy}
-                  onClick={() => void handleRemove(poste)}
+                  onClick={() => handleRemove(poste)}
                   className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                   aria-label={`Supprimer ${poste}`}
                 >
