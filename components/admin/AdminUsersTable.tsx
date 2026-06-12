@@ -82,7 +82,8 @@ export default function AdminUsersTable({ canManage }: AdminUsersTableProps) {
     setBusyId(target.id);
     try {
       await setUserRole(target.id, role);
-      toast.success("Rôle mis à jour");
+      const label = ROLE_LABELS[normalizeAppRole(role) ?? "employee"] ?? role;
+      toast.success(`Rôle mis à jour : ${label}. La personne doit se déconnecter puis se reconnecter.`);
     } catch (err) {
       toast.error(getUserErrorMessage(err, "Impossible de modifier le rôle."));
     } finally {

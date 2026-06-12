@@ -16,7 +16,11 @@ import {
   setAccessToken,
   type LoginCredentials,
 } from "@/lib/authClient";
-import { decodeJwtPayload, getHomeRouteByRole, normalizeAppRole, shouldRefreshAccessToken } from "@/lib/session";
+import {
+  getHomeRouteByRole,
+  resolveAuthoritativeRole,
+  shouldRefreshAccessToken,
+} from "@/lib/session";
 import AuthLoading from "@/components/auth/AuthLoading";
 import {
   PROFILE_STORAGE_KEY,
@@ -58,7 +62,10 @@ function isAuthRejected(err: unknown): boolean {
 function readCachedProfile(): UserMePayload | null {
   const stored = readStoredProfile();
   if (!stored) return null;
-  return normalizeUserMe(stored);
+  const profile = normalizeUserMe(stored);
+  const token = readPersistedAccessTokenRaw();
+  const role = resolveAuthoritativeRole(profile.role, token);
+  return role ? { ...profile, role } : profile;
 }
 
 function persistCachedProfile(profile: UserMePayload): void {
@@ -88,6 +95,13 @@ function unwrapUserMePayload(json: unknown): UserMePayload {
   return normalizeUserMe(user);
 }
 
+/** Rôle compte utilisateur uniquement — jamais déduit de la fiche employé liée. */
+function extractRoleField(o: Record<string, unknown>): string {
+  if (o.role != null && String(o.role).trim() !== "") return String(o.role).trim();
+  if (Array.isArray(o.roles) && o.roles.length > 0) return String(o.roles[0]).trim();
+  return "";
+}
+
 function normalizeUserMe(raw: unknown): UserMePayload {
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const employe =
@@ -97,7 +111,7 @@ function normalizeUserMe(raw: unknown): UserMePayload {
     ...(raw as UserMePayload),
     id: Number(o.id ?? 0),
     email: String(o.email ?? ""),
-    role: String(o.role ?? ""),
+    role: extractRoleField(o),
     nom: String(o.nom ?? ""),
     prenom: String(o.prenom ?? ""),
     employeId:
@@ -116,15 +130,8 @@ function normalizeUserMe(raw: unknown): UserMePayload {
 }
 
 function enrichUserProfile(profile: UserMePayload, accessToken?: string): UserMePayload {
-  const fromApi = normalizeAppRole(profile.role);
-  if (fromApi) return { ...profile, role: fromApi };
-
-  if (accessToken) {
-    const fromJwt = normalizeAppRole(decodeJwtPayload(accessToken)?.role?.toString());
-    if (fromJwt) return { ...profile, role: fromJwt };
-  }
-
-  return profile;
+  const role = resolveAuthoritativeRole(profile.role, accessToken);
+  return role ? { ...profile, role } : profile;
 }
 
 async function authFetchWithTimeout(url: string, init: RequestInit = {}): Promise<Response> {
@@ -364,7 +371,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       let profile: UserMePayload;
       if (result.user) {
-        profile = enrichUserProfile(result.user, result.accessToken);
+        profile = enrichUserProfile(normalizeUserMe(result.user), result.accessToken);
         persistCachedProfile(profile);
       } else {
         profile = await fetchCurrentUser(result.accessToken);

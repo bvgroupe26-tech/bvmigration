@@ -43,6 +43,35 @@ export function getHomeRouteByRole(role?: string | null): string {
   return normalizeAppRole(role) === "employee" ? "/employee/dashboard" : "/dashboard";
 }
 
+/**
+ * Rôle effectif pour l'accès UI : le JWT signé prime sur /auth/me.
+ * Cas fréquent : compte RH lié à une fiche employé → l'API renvoie « employee »
+ * alors que le JWT contient encore « rh » (ou l'inverse après changement de rôle).
+ */
+export function resolveAuthoritativeRole(
+  apiRole?: string | null,
+  accessToken?: string | null
+): AppRole | null {
+  const fromApi = normalizeAppRole(apiRole);
+  const fromJwt = accessToken
+    ? normalizeAppRole(decodeJwtPayload(accessToken)?.role?.toString())
+    : null;
+
+  if (!fromApi && !fromJwt) return null;
+  if (!fromApi) return fromJwt;
+  if (!fromJwt) return fromApi;
+
+  const apiIsStaff = ADMIN_ROLES.includes(fromApi);
+  const jwtIsStaff = ADMIN_ROLES.includes(fromJwt);
+
+  // Staff (rh/admin/manager) vs employee : toujours privilégier le staff
+  if (jwtIsStaff && fromApi === "employee") return fromJwt;
+  if (apiIsStaff && fromJwt === "employee") return fromApi;
+
+  // Deux rôles staff ou deux employee : JWT = source signée
+  return fromJwt;
+}
+
 export function decodeJwtPayload(token: string): JwtPayload | null {
   try {
     const parts = token.split(".");
