@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useForm, type Resolver } from "react-hook-form";
+import { Controller, useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Eye, EyeOff, Lock, Mail, Shield, User } from "lucide-react";
+import { BanknoteIcon, Eye, EyeOff, Lock, Mail, Shield, User } from "lucide-react";
 import { staffAccountSchema, type StaffAccountInput } from "@/lib/schemas";
 import { createStaffAccount } from "@/lib/staff-account-api";
 import { getUserErrorMessage } from "@/lib/apiClient";
@@ -20,6 +20,7 @@ import { normalizeAppRole } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import { Field, Input, NativeSelect } from "@/components/ui/Field";
 import GlassCard from "@/components/ui/GlassCard";
+import MoneyInput from "@/components/ui/MoneyInput";
 
 type Props = {
   onSuccess?: () => void;
@@ -45,6 +46,7 @@ export default function StaffAccountForm({ onSuccess }: Props) {
     handleSubmit,
     reset,
     watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<StaffAccountInput>({
     resolver: zodResolver(staffAccountSchema) as unknown as Resolver<StaffAccountInput>,
@@ -55,6 +57,7 @@ export default function StaffAccountForm({ onSuccess }: Props) {
       nom: "",
       prenom: "",
       role: defaultRole,
+      salaireBase: 0,
     },
   });
 
@@ -79,6 +82,7 @@ export default function StaffAccountForm({ onSuccess }: Props) {
         nom: "",
         prenom: "",
         role: defaultRole,
+        salaireBase: 0,
       });
       onSuccess?.();
     } catch (err) {
@@ -162,6 +166,29 @@ export default function StaffAccountForm({ onSuccess }: Props) {
         ) : null}
       </Field>
 
+      <Field
+        label="Salaire de base (FCFA)"
+        error={errors.salaireBase?.message}
+        hint="Inclus dans la masse salariale dès la création. Peut être modifié ultérieurement dans la fiche employé."
+      >
+        <div className="relative">
+          <BanknoteIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Controller
+            name="salaireBase"
+            control={control}
+            render={({ field }) => (
+              <MoneyInput
+                value={field.value ?? 0}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                className="!pl-10"
+                placeholder="0"
+              />
+            )}
+          />
+        </div>
+      </Field>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Mot de passe initial" required error={errors.password?.message}>
           <div className="relative">
@@ -220,6 +247,7 @@ export default function StaffAccountForm({ onSuccess }: Props) {
               nom: "",
               prenom: "",
               role: defaultRole,
+              salaireBase: 0,
             })
           }
         >

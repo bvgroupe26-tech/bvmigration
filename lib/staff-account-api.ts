@@ -7,6 +7,7 @@ type StaffPayload = {
   nom: string;
   prenom: string;
   role: StaffAccountInput["role"];
+  salaireBase?: number;
 };
 
 type CreatedStaffUser = {

@@ -31,6 +31,7 @@ export const staffAccountSchema = z
     nom: z.string().min(2, "Nom requis").transform((s) => s.trim()),
     prenom: z.string().min(2, "Prénom requis").transform((s) => s.trim()),
     role: z.enum(["admin", "rh", "manager"]).default("rh"),
+    salaireBase: montantFcfaNonNegatif().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.password !== data.password_confirm) {
