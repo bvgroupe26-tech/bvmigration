@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, ShieldAlert } from "lucide-react";
+import Link from "next/link";
+import { Search, ShieldAlert, UserPen } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminUsers } from "@/hooks/useAdminUsers";
@@ -175,14 +176,14 @@ export default function AdminUsersTable({ canManage }: AdminUsersTableProps) {
                 <th className="px-4 py-3">Rôle</th>
                 <th className="px-4 py-3">Statut</th>
                 <th className="px-4 py-3">Dernière connexion</th>
-                {canManage ? <th className="px-4 py-3 text-right">Actions</th> : null}
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={canManage ? 5 : 4}
+                    colSpan={5}
                     className="px-4 py-10 text-center text-slate-500"
                   >
                     Aucun utilisateur ne correspond à ces critères.
@@ -257,27 +258,35 @@ export default function AdminUsersTable({ canManage }: AdminUsersTableProps) {
                           ? formatNotificationDate(u.lastLogin)
                           : "Jamais connecté"}
                       </td>
-                      {canManage ? (
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            type="button"
-                            disabled={busyId === u.id || (isSelf && u.isActive)}
-                            onClick={() => void handleToggleActive(u, !u.isActive)}
-                            className={cn(
-                              "rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50",
-                              u.isActive
-                                ? "border border-red-200 text-red-700 hover:bg-red-50"
-                                : "border border-emerald-200 text-emerald-800 hover:bg-emerald-50"
-                            )}
-                          >
-                            {busyId === u.id
-                              ? "…"
-                              : u.isActive
-                                ? "Désactiver"
-                                : "Activer"}
-                          </button>
-                        </td>
-                      ) : null}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          {u.employe_id ? (
+                            <Link
+                              href={`/employes/${u.employe_id}`}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-[#2F5F9D]/30 bg-[#E8F0FA] px-3 py-1.5 text-xs font-semibold text-[#1F3F73] transition hover:bg-[#2F5F9D] hover:text-white"
+                              title="Modifier la fiche employé"
+                            >
+                              <UserPen className="h-3.5 w-3.5" />
+                              Fiche
+                            </Link>
+                          ) : null}
+                          {canManage ? (
+                            <button
+                              type="button"
+                              disabled={busyId === u.id || (isSelf && u.isActive)}
+                              onClick={() => void handleToggleActive(u, !u.isActive)}
+                              className={cn(
+                                "rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50",
+                                u.isActive
+                                  ? "border border-red-200 text-red-700 hover:bg-red-50"
+                                  : "border border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+                              )}
+                            >
+                              {busyId === u.id ? "…" : u.isActive ? "Désactiver" : "Activer"}
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })

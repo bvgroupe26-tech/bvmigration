@@ -10,6 +10,7 @@ export type AdminUserRecord = {
   isActive: boolean;
   createdAt: string;
   lastLogin: string | null;
+  employe_id: number | null;
 };
 
 function rec(v: unknown): Record<string, unknown> {
@@ -26,6 +27,7 @@ export function normalizeAdminUser(raw: unknown): AdminUserRecord | null {
   const id = num(o.id);
   if (id <= 0) return null;
 
+  const rawEmployeId = o.employe_id ?? o.employeId;
   return {
     id,
     email: String(o.email ?? ""),
@@ -38,6 +40,7 @@ export function normalizeAdminUser(raw: unknown): AdminUserRecord | null {
       o.lastLogin != null || o.last_login != null
         ? String(o.lastLogin ?? o.last_login)
         : null,
+    employe_id: rawEmployeId != null && Number.isFinite(Number(rawEmployeId)) ? Number(rawEmployeId) : null,
   };
 }
 

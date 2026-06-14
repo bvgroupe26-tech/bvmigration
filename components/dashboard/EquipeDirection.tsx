@@ -96,15 +96,17 @@ function StaffCard({ user, index }: { user: AdminUserRecord; index: number }) {
       {/* Dernière connexion */}
       <p className="text-[11px] text-slate-400 leading-none">{formatLastLogin(user.lastLogin)}</p>
 
-      {/* Lien vers la fiche (admin seulement, visible au hover) */}
-      <Link
-        href="/administration/comptes"
-        onClick={(e) => e.stopPropagation()}
-        className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg border border-slate-100 bg-white text-slate-400 opacity-0 shadow-sm transition group-hover:opacity-100 hover:border-slate-200 hover:text-[#2F5F9D]"
-        title="Gérer le compte"
-      >
-        <ExternalLink className="h-3.5 w-3.5" />
-      </Link>
+      {/* Lien vers la fiche employé (visible au hover) */}
+      {user.employe_id ? (
+        <Link
+          href={`/employes/${user.employe_id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg border border-slate-100 bg-white text-slate-400 opacity-0 shadow-sm transition group-hover:opacity-100 hover:border-[#2F5F9D]/30 hover:text-[#2F5F9D]"
+          title="Voir la fiche employé"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+        </Link>
+      ) : null}
     </motion.div>
   );
 }
