@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 
-const OFFLINE_ASSETS_REVISION = "8";
+const OFFLINE_ASSETS_REVISION = "9";
 
 const withPWA = withPWAInit({
   dest: "public",
@@ -25,6 +25,7 @@ const withPWA = withPWAInit({
       /^\/api\//,
       /^\/_next\//,
       /^\/login/,
+      /^\/administration\//,
       /^\/manifest\.webmanifest$/,
       /^\/icons\//,
       /^\/favicon/,
@@ -63,7 +64,7 @@ const withPWA = withPWAInit({
         handler: "NetworkFirst",
         options: {
           cacheName: "api-nest-cache",
-          networkTimeoutSeconds: 5,
+          networkTimeoutSeconds: 15,
           expiration: {
             maxEntries: 80,
             maxAgeSeconds: 3600,

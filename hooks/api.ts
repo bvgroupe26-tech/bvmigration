@@ -17,6 +17,7 @@ import {
   type PaieStatsPayload,
 } from "@/lib/paie-utils";
 import { normalizeEmploye, normalizeEmployeList } from "@/lib/employe-utils";
+import { normalizeAdminUserList, type AdminUserRecord } from "@/lib/users-admin-api";
 import { normalizePresence, normalizePresenceList } from "@/lib/presence-utils";
 import {
   enrichAbsencesWithEmployes,
@@ -466,6 +467,16 @@ export function useDashboardActivite() {
     AUTO
   );
   return { activites: data ?? [], isLoading, error, mutate };
+}
+
+// ============ Utilisateurs staff (admin / rh / manager) ============
+export function useAdminUsers() {
+  const { data, error, isLoading, mutate } = useSWR<AdminUserRecord[]>(
+    "/users",
+    async () => normalizeAdminUserList(await fetcher<unknown>("/users")),
+    SHORT
+  );
+  return { users: data ?? [], isLoading, error, mutate };
 }
 
 export function useDashboardRecrutements() {

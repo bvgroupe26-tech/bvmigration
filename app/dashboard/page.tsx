@@ -18,6 +18,7 @@ import PresenceChart from "@/components/dashboard/PresenceChart";
 import DepartementsDonut from "@/components/dashboard/DepartementsDonut";
 import ActiviteFeed from "@/components/dashboard/ActiviteFeed";
 import RecrutementsListe from "@/components/dashboard/RecrutementsListe";
+import EquipeDirection from "@/components/dashboard/EquipeDirection";
 import { useEmployeePanel } from "@/components/EmployeeDetailPanel";
 import { useDashboardStats, useEmployes } from "@/hooks/api";
 import type { Employe } from "@/lib/types";
@@ -200,6 +201,9 @@ export default function DashboardPage() {
           <RecrutementsListe />
         </div>
       </div>
+
+      {/* Équipe de direction */}
+      <EquipeDirection />
 
       {/* Derniers employés */}
       <GlassCard className="p-6">
