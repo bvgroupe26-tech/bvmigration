@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { cn, getAvatarGradient, getInitials } from "@/lib/utils";
 import { resolveAvatarUrl } from "@/lib/avatar-utils";
 
@@ -36,22 +37,30 @@ export default function Avatar({
   showStatus = false,
   status = "online",
 }: AvatarProps) {
+  const [imgError, setImgError] = useState(false);
+
   const initials = getInitials(nom, prenom);
   const gradient = getAvatarGradient(`${prenom ?? ""}${nom}`);
   const photoUrl = resolveAvatarUrl(src ?? null);
+  const showPhoto = photoUrl && !imgError;
 
   return (
     <div className={cn("relative inline-flex shrink-0", className)}>
       <div
         className={cn(
           "flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-br font-display font-bold text-white ring-1 ring-white/10 shadow-sm",
-          !photoUrl && gradient,
+          !showPhoto && gradient,
           SIZES[size]
         )}
       >
-        {photoUrl ? (
+        {showPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+          <img
+            src={photoUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            onError={() => setImgError(true)}
+          />
         ) : (
           initials
         )}
