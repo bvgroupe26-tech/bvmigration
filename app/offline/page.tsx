@@ -13,7 +13,7 @@ function resolveReturnRoute(profile: ReturnType<typeof readCachedProfile>): stri
   return readLastRoute() ?? (profile ? getHomeRouteByRole(profile.role) : "/dashboard");
 }
 
-const PING_URL = "/api/nest/health";
+const PING_URL = "/api/nest/health/ping";
 const PING_INTERVAL_MS = 8000;
 
 export default function OfflinePage() {

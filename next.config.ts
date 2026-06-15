@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 
-const OFFLINE_ASSETS_REVISION = "9";
+const OFFLINE_ASSETS_REVISION = "10";
 
 const withPWA = withPWAInit({
   dest: "public",
