@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, ShieldAlert, UserPen } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, ShieldAlert, UserPen, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminUsers } from "@/hooks/useAdminUsers";
@@ -38,8 +39,9 @@ type AdminUsersTableProps = {
 };
 
 export default function AdminUsersTable({ canManage }: AdminUsersTableProps) {
+  const router = useRouter();
   const { user: currentUser } = useAuth();
-  const { users, isLoading, error, setUserActive, setUserRole } = useAdminUsers();
+  const { users, isLoading, error, setUserActive, setUserRole, createEmployeFiche } = useAdminUsers();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
@@ -69,6 +71,19 @@ export default function AdminUsersTable({ canManage }: AdminUsersTableProps) {
       toast.success(next ? "Compte activé" : "Compte désactivé");
     } catch (err) {
       toast.error(getUserErrorMessage(err, "Impossible de modifier le statut du compte."));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleCreateFiche(target: AdminUserRecord) {
+    setBusyId(target.id);
+    try {
+      const employe_id = await createEmployeFiche(target.id);
+      toast.success("Fiche employé créée");
+      router.push(`/employes/${employe_id}`);
+    } catch (err) {
+      toast.error(getUserErrorMessage(err, "Impossible de créer la fiche employé."));
     } finally {
       setBusyId(null);
     }
@@ -269,6 +284,17 @@ export default function AdminUsersTable({ canManage }: AdminUsersTableProps) {
                               <UserPen className="h-3.5 w-3.5" />
                               Fiche
                             </Link>
+                          ) : ["admin", "rh", "manager"].includes(normalizeAppRole(u.role) ?? "") ? (
+                            <button
+                              type="button"
+                              disabled={busyId === u.id}
+                              onClick={() => void handleCreateFiche(u)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
+                              title="Créer la fiche employé manquante"
+                            >
+                              <UserPlus className="h-3.5 w-3.5" />
+                              {busyId === u.id ? "…" : "Créer fiche"}
+                            </button>
                           ) : null}
                           {canManage ? (
                             <button

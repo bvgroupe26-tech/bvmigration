@@ -2,6 +2,7 @@
 
 import useSWR from "swr";
 import {
+  ensureUserEmploye,
   fetchAdminUsers,
   updateAdminUser,
   type AdminUserRecord,
@@ -26,6 +27,12 @@ export function useAdminUsers() {
     await mutate();
   }
 
+  async function createEmployeFiche(id: number): Promise<number> {
+    const result = await ensureUserEmploye(id);
+    await mutate();
+    return result.employe_id;
+  }
+
   return {
     users: data ?? [],
     isLoading,
@@ -33,5 +40,6 @@ export function useAdminUsers() {
     mutate,
     setUserActive,
     setUserRole,
+    createEmployeFiche,
   };
 }

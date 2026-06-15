@@ -56,6 +56,10 @@ export async function fetchAdminUsers(): Promise<AdminUserRecord[]> {
   return normalizeAdminUserList(raw);
 }
 
+export async function ensureUserEmploye(id: number): Promise<{ employe_id: number }> {
+  return apiClient.post<{ employe_id: number }>(`/users/${id}/ensure-employe`, {});
+}
+
 export async function updateAdminUser(
   id: number,
   body: { isActive?: boolean; role?: string }
