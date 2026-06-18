@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Users, CheckCircle2, Clock, XCircle, Plus, CalendarOff } from "lucide-react";
@@ -9,39 +9,96 @@ import Button from "@/components/ui/Button";
 import GlassCard from "@/components/ui/GlassCard";
 import StatBadge from "@/components/ui/StatBadge";
 import Avatar from "@/components/ui/Avatar";
-import SectionHeader from "@/components/ui/SectionHeader";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import Skeleton from "@/components/ui/Skeleton";
 import PresenceForm from "@/components/forms/PresenceForm";
-import { usePresences, usePresencesToday } from "@/hooks/api";
-import { formatPresenceDate } from "@/lib/presence-utils";
+import { useEmployes, usePresences } from "@/hooks/api";
+import {
+  computeDailyPresenceRate,
+  computePresenceStats,
+  formatPresenceDate,
+  getMonthBounds,
+} from "@/lib/presence-utils";
 import type { Presence } from "@/lib/types";
 
+const MOIS = [
+  "Janvier",
+  "Février",
+  "Mars",
+  "Avril",
+  "Mai",
+  "Juin",
+  "Juillet",
+  "Août",
+  "Septembre",
+  "Octobre",
+  "Novembre",
+  "Décembre",
+];
+
+type ViewMode = "day" | "month";
+
 export default function PresencePage() {
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [date, setDate] = useState(today);
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
   const [statutFilter, setStatutFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
+  const [checkoutPresence, setCheckoutPresence] = useState<Presence | null>(null);
 
-  const { presences, isLoading, mutate } = usePresences({
-    date,
-    statut: statutFilter === "all" ? undefined : statutFilter,
-  });
-  const { data: todayData, mutate: mutateToday } = usePresencesToday();
+  const monthBounds = useMemo(() => getMonthBounds(year, month), [year, month]);
+  const { employes } = useEmployes({ statut: "actif", limit: 500 });
+  const activeCount = employes.length;
 
-  const tauxPresence = useMemo(() => {
-    const c = todayData?.counts;
-    if (!c || !c.total) return 0;
-    return Math.round(((c.present + c.retard) / c.total) * 100);
-  }, [todayData]);
+  const presenceFilters =
+    viewMode === "day"
+      ? {
+          date,
+          statut: statutFilter === "all" ? undefined : statutFilter,
+          limit: 500,
+        }
+      : {
+          date_from: monthBounds.date_from,
+          date_to: monthBounds.date_to,
+          statut: statutFilter === "all" ? undefined : statutFilter,
+          limit: 500,
+        };
+
+  const { presences, isLoading, mutate } = usePresences(presenceFilters);
+
+  const dayRate = useMemo(
+    () => computeDailyPresenceRate(presences, activeCount),
+    [presences, activeCount]
+  );
+  const monthStats = useMemo(() => computePresenceStats(presences), [presences]);
+  const monthTaux =
+    monthStats.total > 0
+      ? Math.round(((monthStats.present + monthStats.retard) / monthStats.total) * 100)
+      : 0;
+
+  const subtitle =
+    viewMode === "day"
+      ? new Date(date).toLocaleDateString("fr-FR", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : `${MOIS[month - 1]} ${year}`;
 
   const columns: Column<Presence>[] = [
     {
       key: "employe",
       header: "Employé",
       render: (p) => (
-        <Link href={`/employes/${p.employe_id}`} className="flex items-center gap-3 group">
+        <Link
+          href={`/employes/${p.employe_id}/presence`}
+          className="flex items-center gap-3 group"
+        >
           <Avatar nom={p.employe_nom ?? "?"} prenom={p.employe_prenom ?? ""} size="sm" />
           <div className="min-w-0">
             <p className="truncate font-semibold text-slate-900 group-hover:text-[#1F3F73] transition">
@@ -62,12 +119,16 @@ export default function PresencePage() {
     {
       key: "entree",
       header: "Arrivée",
-      render: (p) => <span className="font-mono text-xs text-text-secondary">{p.heure_entree ?? "—"}</span>,
+      render: (p) => (
+        <span className="font-mono text-xs text-text-secondary">{p.heure_entree ?? "—"}</span>
+      ),
     },
     {
       key: "sortie",
       header: "Sortie",
-      render: (p) => <span className="font-mono text-xs text-text-secondary">{p.heure_sortie ?? "—"}</span>,
+      render: (p) => (
+        <span className="font-mono text-xs text-text-secondary">{p.heure_sortie ?? "—"}</span>
+      ),
     },
     {
       key: "hs",
@@ -84,8 +145,32 @@ export default function PresencePage() {
       header: "Statut",
       align: "right",
       render: (p) => (
-        <div className="flex justify-end">
-          <StatBadge variant={p.statut}>{p.statut}</StatBadge>
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-2">
+            {p.heure_entree && !p.heure_sortie ? (
+              <button
+                type="button"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  setCheckoutPresence(p);
+                }}
+                className="text-xs font-semibold text-amber-700 hover:text-amber-900"
+              >
+                + Sortie
+              </button>
+            ) : null}
+            <Link
+              href={`/employes/${p.employe_id}/presence`}
+              className="hidden text-xs font-medium text-[#2F5F9D] hover:text-[#1F3F73] sm:inline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              Historique
+            </Link>
+            <StatBadge variant={p.statut}>{p.statut}</StatBadge>
+          </div>
+          {p.heure_entree && !p.heure_sortie ? (
+            <span className="text-[10px] text-amber-700">En attente de sortie</span>
+          ) : null}
         </div>
       ),
     },
@@ -100,10 +185,18 @@ export default function PresencePage() {
         className="flex flex-wrap items-center justify-between gap-3"
       >
         <div>
-          <h1 className="font-display text-[28px] font-bold tracking-tight text-slate-900">Présences</h1>
+          <h1 className="font-display text-[28px] font-bold tracking-tight text-slate-900">
+            Présences
+          </h1>
           <p className="mt-1 text-sm text-text-secondary">
-            Pointage journalier · {new Date(date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            {viewMode === "day" ? "Pointage journalier" : "Historique mensuel"} · {subtitle}
           </p>
+          {viewMode === "day" && activeCount > 0 ? (
+            <p className="mt-1 text-xs text-slate-500">
+              Effectif actif : {activeCount} employé(s)
+              {dayRate.nonPointes > 0 ? ` · ${dayRate.nonPointes} non pointé(s)` : ""}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/presence/absences">
@@ -112,31 +205,104 @@ export default function PresencePage() {
             </Button>
           </Link>
           <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setShowAdd(true)}>
-            Enregistrer
+            Pointer
           </Button>
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard title="Présents" value={todayData?.counts?.present ?? 0} icon={CheckCircle2} color="green" index={0} />
-        <KPICard title="Retards" value={todayData?.counts?.retard ?? 0} icon={Clock} color="amber" index={1} />
-        <KPICard title="Absents" value={todayData?.counts?.absent ?? 0} icon={XCircle} color="red" index={2} />
-        <KPICard title="Taux de présence" value={tauxPresence} icon={Users} color="blue" suffix="%" index={3} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {viewMode === "day" ? (
+          <>
+            <KPICard title="Présents" value={dayRate.present} icon={CheckCircle2} color="green" index={0} />
+            <KPICard title="Retards" value={dayRate.retard} icon={Clock} color="amber" index={1} />
+            <KPICard title="Absents / non pointés" value={dayRate.absent} icon={XCircle} color="red" index={2} />
+            <KPICard
+              title="Taux de présence"
+              value={dayRate.tauxPct}
+              icon={Users}
+              color="blue"
+              suffix="%"
+              index={3}
+            />
+          </>
+        ) : (
+          <>
+            <KPICard title="Présents" value={monthStats.present} icon={CheckCircle2} color="green" index={0} />
+            <KPICard title="Retards" value={monthStats.retard} icon={Clock} color="amber" index={1} />
+            <KPICard title="Absents" value={monthStats.absent} icon={XCircle} color="red" index={2} />
+            <KPICard title="Taux sur pointages" value={monthTaux} icon={Users} color="blue" suffix="%" index={3} />
+          </>
+        )}
       </div>
 
       <GlassCard className="p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-display text-base font-semibold text-slate-900">Pointages du jour</h2>
+            <h2 className="font-display text-base font-semibold text-slate-900">
+              {viewMode === "day" ? "Pointages du jour" : "Pointages du mois"}
+            </h2>
             <p className="text-xs text-text-secondary">{presences.length} enregistrement(s)</p>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode("day")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  viewMode === "day"
+                    ? "bg-white text-[#1F3F73] shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Jour
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("month")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  viewMode === "month"
+                    ? "bg-white text-[#1F3F73] shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Mois
+              </button>
+            </div>
+
+            {viewMode === "day" ? (
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+              />
+            ) : (
+              <>
+                <select
+                  value={month}
+                  onChange={(e) => setMonth(Number(e.target.value))}
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                >
+                  {MOIS.map((label, i) => (
+                    <option key={label} value={i + 1}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={year}
+                  onChange={(e) => setYear(Number(e.target.value))}
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                >
+                  {Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i).map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
             <select
               value={statutFilter}
               onChange={(e) => setStatutFilter(e.target.value)}
@@ -151,10 +317,13 @@ export default function PresencePage() {
             </select>
           </div>
         </div>
+
         <div className="mt-5">
           {isLoading ? (
             <div className="space-y-2">
-              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
             </div>
           ) : (
             <DataTable
@@ -162,8 +331,12 @@ export default function PresencePage() {
               columns={columns}
               rowKey={(p) => p.id}
               pagination
-              pageSize={10}
-              emptyMessage="Aucun pointage pour cette date. Cliquez sur « Enregistrer » pour en ajouter."
+              pageSize={viewMode === "month" ? 15 : 10}
+              emptyMessage={
+                viewMode === "day"
+                  ? "Aucun pointage pour cette date. Cliquez sur « Enregistrer » pour en ajouter."
+                  : "Aucun pointage pour ce mois."
+              }
             />
           )}
         </div>
@@ -172,18 +345,42 @@ export default function PresencePage() {
       <Modal
         open={showAdd}
         onClose={() => setShowAdd(false)}
-        title="Enregistrer une présence"
-        description="Pointage manuel d'un employé"
+        title="Pointer une présence"
+        description="Arrivée et sortie peuvent être enregistrées séparément"
       >
         <PresenceForm
-          defaultDate={date}
+          defaultDate={viewMode === "day" ? date : today}
           onSuccess={() => {
             setShowAdd(false);
             mutate();
-            mutateToday();
           }}
           onCancel={() => setShowAdd(false)}
         />
+      </Modal>
+
+      <Modal
+        open={Boolean(checkoutPresence)}
+        onClose={() => setCheckoutPresence(null)}
+        title="Enregistrer la sortie"
+        description={
+          checkoutPresence
+            ? `${checkoutPresence.employe_prenom} ${checkoutPresence.employe_nom} · arrivée ${checkoutPresence.heure_entree ?? "—"}`
+            : undefined
+        }
+      >
+        {checkoutPresence ? (
+          <PresenceForm
+            initialMode="sortie"
+            existingPresence={checkoutPresence}
+            defaultDate={checkoutPresence.date}
+            defaultEmployeId={checkoutPresence.employe_id}
+            onSuccess={() => {
+              setCheckoutPresence(null);
+              mutate();
+            }}
+            onCancel={() => setCheckoutPresence(null)}
+          />
+        ) : null}
       </Modal>
     </div>
   );

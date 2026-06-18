@@ -92,3 +92,37 @@ export function computePresenceStats(presences: Presence[]) {
     total: presences.length,
   };
 }
+
+/** Taux basé sur le nombre d'employés actifs (pas seulement les fiches pointées). */
+export function computeDailyPresenceRate(
+  presences: Presence[],
+  activeEmployeeCount: number
+): {
+  present: number;
+  retard: number;
+  absent: number;
+  conge: number;
+  mission: number;
+  nonPointes: number;
+  tauxPct: number;
+  effectif: number;
+} {
+  const stats = computePresenceStats(presences);
+  const effectif = Math.max(activeEmployeeCount, 0);
+  const pointes = stats.present + stats.retard + stats.absent + stats.conge + stats.mission;
+  const nonPointes = Math.max(0, effectif - pointes);
+  const presentsEffectifs = stats.present + stats.retard;
+  const tauxPct =
+    effectif > 0 ? Math.round((presentsEffectifs / effectif) * 100) : 0;
+
+  return {
+    present: stats.present,
+    retard: stats.retard,
+    absent: stats.absent + nonPointes,
+    conge: stats.conge,
+    mission: stats.mission,
+    nonPointes,
+    tauxPct,
+    effectif,
+  };
+}

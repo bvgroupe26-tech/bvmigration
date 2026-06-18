@@ -18,6 +18,7 @@ import {
   Award,
   GraduationCap,
   CalendarOff,
+  Clock,
 } from "lucide-react";
 import Avatar from "@/components/ui/Avatar";
 import Button from "@/components/ui/Button";
@@ -28,8 +29,9 @@ import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Skeleton from "@/components/ui/Skeleton";
 import EmployeForm from "@/components/forms/EmployeForm";
-import { useEmploye, useCompetences, useFormations, useEvaluations, usePaie, useAbsences } from "@/hooks/api";
+import { useEmploye, useCompetences, useFormations, useEvaluations, usePaie, useAbsences, usePresences } from "@/hooks/api";
 import { absenceDureeJours, formatMoisPaie, formatPeriodeAbsence } from "@/lib/absence-utils";
+import { formatPresenceDate, getMonthBounds } from "@/lib/presence-utils";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import { useRouter } from "next/navigation";
 
@@ -43,6 +45,13 @@ export default function EmployeDetailPage({ params }: { params: Promise<{ id: st
   const { evaluations } = useEvaluations({ employe_id: empId });
   const { bulletins } = usePaie();
   const { absences: employeAbsences } = useAbsences({ employe_id: empId });
+  const monthBounds = getMonthBounds(new Date().getFullYear(), new Date().getMonth() + 1);
+  const { presences: recentPresences } = usePresences({
+    employe_id: empId,
+    date_from: monthBounds.date_from,
+    date_to: monthBounds.date_to,
+    limit: 5,
+  });
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -90,6 +99,11 @@ export default function EmployeDetailPage({ params }: { params: Promise<{ id: st
           <ArrowLeft className="h-4 w-4" /> Retour aux employés
         </Link>
         <div className="flex items-center gap-2">
+          <Link href={`/employes/${empId}/presence`}>
+            <Button variant="ghost" icon={<Clock className="h-4 w-4" />}>
+              Présences
+            </Button>
+          </Link>
           <Button variant="ghost" icon={<Pencil className="h-4 w-4" />} onClick={() => setEditing(true)}>
             Modifier
           </Button>
@@ -196,6 +210,45 @@ export default function EmployeDetailPage({ params }: { params: Promise<{ id: st
                   )}
                 </li>
               ))}
+            </ul>
+          )}
+        </GlassCard>
+
+        <GlassCard className="p-5">
+          <SectionHeader
+            title="Présences ce mois"
+            subtitle={`${recentPresences.length} pointage(s) récent(s)`}
+            icon={<Clock className="h-4 w-4" />}
+            actions={
+              <Link
+                href={`/employes/${empId}/presence`}
+                className="text-xs font-medium text-[#2F5F9D] hover:text-[#1F3F73]"
+              >
+                Historique complet →
+              </Link>
+            }
+          />
+          {recentPresences.length === 0 ? (
+            <p className="mt-4 text-sm text-text-tertiary">Aucun pointage ce mois.</p>
+          ) : (
+            <ul className="mt-4 space-y-2">
+              {[...recentPresences]
+                .sort((a, b) => b.date.localeCompare(a.date))
+                .slice(0, 5)
+                .map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white/[0.02] px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900">{formatPresenceDate(p.date)}</p>
+                      <p className="text-[11px] text-text-tertiary">
+                        {p.heure_entree ?? "—"} → {p.heure_sortie ?? "—"}
+                      </p>
+                    </div>
+                    <StatBadge variant={p.statut}>{p.statut}</StatBadge>
+                  </li>
+                ))}
             </ul>
           )}
         </GlassCard>

@@ -395,6 +395,14 @@ export default function EmployeeDetailPanel({ employee, isOpen, onClose }: Emplo
                   </span>
                 </div>
                 <Link
+                  href={`/employes/${employee.id}/presence`}
+                  onClick={onClose}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-[#2F5F9D] transition hover:text-[#1F3F73]"
+                >
+                  Fiche de présence
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+                <Link
                   href={`/employes/${employee.id}`}
                   onClick={onClose}
                   className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-[#2F5F9D] transition hover:text-[#1F3F73]"

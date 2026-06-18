@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ import {
   Pencil,
   Trash2,
   Download,
+  Clock,
 } from "lucide-react";
 import KPICard from "@/components/ui/KPICard";
 import Button from "@/components/ui/Button";
@@ -26,7 +28,6 @@ import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Skeleton from "@/components/ui/Skeleton";
 import EmployeForm from "@/components/forms/EmployeForm";
-import { useEmployeePanel } from "@/components/EmployeeDetailPanel";
 import { useEmployes } from "@/hooks/api";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import type { Employe } from "@/lib/types";
@@ -34,7 +35,7 @@ import type { Employe } from "@/lib/types";
 const DEPARTEMENTS = ["Tech", "Commercial", "Marketing", "Finance", "RH", "Direction", "Produit", "Juridique"];
 
 export default function EmployesPage() {
-  const { openPanel } = useEmployeePanel();
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [departement, setDepartement] = useState("all");
   const [type_contrat, setTypeContrat] = useState("all");
@@ -127,9 +128,13 @@ export default function EmployesPage() {
             status={e.statut === "actif" ? "online" : "offline"}
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold text-slate-900 group-hover:text-[#1F3F73] transition">
+            <Link
+              href={`/employes/${e.id}/presence`}
+              onClick={(ev) => ev.stopPropagation()}
+              className="block truncate font-semibold text-slate-900 transition hover:text-[#1F3F73]"
+            >
               {e.prenom} {e.nom}
-            </p>
+            </Link>
             <p className="truncate text-xs text-text-tertiary">{e.email ?? "—"}</p>
           </div>
           <Link
@@ -211,6 +216,14 @@ export default function EmployesPage() {
       align: "right",
       render: (e) => (
         <div className="flex items-center justify-end gap-1">
+          <Link
+            href={`/employes/${e.id}/presence`}
+            onClick={(ev) => ev.stopPropagation()}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-text-secondary transition hover:bg-[#2F5F9D]/15 hover:text-[#1F3F73]"
+            title="Fiche de présence"
+          >
+            <Clock className="h-3.5 w-3.5" />
+          </Link>
           <button
             type="button"
             onClick={(ev) => {
@@ -340,7 +353,7 @@ export default function EmployesPage() {
               rowKey={(e) => e.id}
               pagination
               pageSize={10}
-              onRowClick={(e) => openPanel(e)}
+              onRowClick={(e) => router.push(`/employes/${e.id}/presence`)}
               emptyMessage={
                 search || departement !== "all" || type_contrat !== "all" || statut !== "all"
                   ? "Aucun employé ne correspond aux filtres"

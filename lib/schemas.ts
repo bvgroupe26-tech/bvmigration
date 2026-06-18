@@ -188,6 +188,11 @@ export const presenceSchema = z.object({
 });
 export type PresenceInput = z.infer<typeof presenceSchema>;
 
+export const arriveePresenceSchema = presenceSchema.extend({
+  heure_entree: z.string().min(1, "Heure d'arrivée requise"),
+});
+export type ArriveePresenceInput = z.infer<typeof arriveePresenceSchema>;
+
 // ============ ABSENCES ============
 export const absenceSchema = z.object({
   employe_id: z.coerce.number().int().positive("Employé requis"),
@@ -342,7 +347,11 @@ export const budgetEnveloppeSchema = z.object({
 export type BudgetEnveloppeInput = z.infer<typeof budgetEnveloppeSchema>;
 
 export const budgetDepenseSchema = z.object({
-  enveloppe_id: z.coerce.number().int().positive("Enveloppe requise"),
+  enveloppe_id: z.preprocess((v) => {
+    if (v === "" || v === null || v === undefined) return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  }, z.number().int().positive().optional()),
   categorie_id: z.preprocess((v) => {
     if (v === "" || v === null || v === undefined) return undefined;
     const n = Number(v);

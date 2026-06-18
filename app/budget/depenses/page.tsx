@@ -16,6 +16,7 @@ import BudgetDepenseForm from "@/components/forms/BudgetDepenseForm";
 import { useBudgetDepenses, useBudgetEnveloppes, useBudgetCategories } from "@/hooks/api";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import { formatFCFA } from "@/lib/utils";
+import { isDefaultBudgetEnveloppe } from "@/lib/budget-depense-utils";
 import type { BudgetDepense } from "@/lib/types";
 
 export default function BudgetDepensesPage() {
@@ -57,7 +58,13 @@ export default function BudgetDepensesPage() {
     {
       key: "env",
       header: "Enveloppe",
-      render: (d) => <span className="text-sm text-slate-600">{d.enveloppe_libelle ?? "—"}</span>,
+      render: (d) => (
+        <span className="text-sm text-slate-600">
+          {d.enveloppe_libelle && !isDefaultBudgetEnveloppe(d.enveloppe_libelle)
+            ? d.enveloppe_libelle
+            : "Budget global"}
+        </span>
+      ),
     },
     {
       key: "cat",
@@ -129,17 +136,7 @@ export default function BudgetDepensesPage() {
         title="Dépenses"
         subtitle="Saisie et validation du reporting budgétaire"
         actions={
-          <Button
-            variant="primary"
-            icon={<Plus className="h-4 w-4" />}
-            onClick={() => {
-              if (!enveloppes.length) {
-                toast.error("Créez d'abord une enveloppe budgétaire");
-                return;
-              }
-              setShowAdd(true);
-            }}
-          >
+          <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setShowAdd(true)}>
             Nouvelle dépense
           </Button>
         }

@@ -76,8 +76,8 @@ export default function BudgetOverviewPage() {
             Suivi budgétaire
           </motion.h2>
           <p className="mt-1 max-w-2xl text-sm text-text-secondary">
-            Reporting des dépenses par rapport aux enveloppes prévues. Workflow : catégories → enveloppes → saisie des
-            dépenses (validation par statut).
+            Suivi des dépenses et du budget. Saisissez directement une dépense ou ventilez-la sur une enveloppe
+            optionnelle (validation par statut).
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
