@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Users, CheckCircle2, Clock, XCircle, Plus, CalendarOff } from "lucide-react";
+import { Users, CheckCircle2, Clock, XCircle, Plus, CalendarOff, Printer } from "lucide-react";
 import KPICard from "@/components/ui/KPICard";
 import Button from "@/components/ui/Button";
 import GlassCard from "@/components/ui/GlassCard";
@@ -49,6 +49,18 @@ export default function PresencePage() {
   const [statutFilter, setStatutFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [checkoutPresence, setCheckoutPresence] = useState<Presence | null>(null);
+  const [printMode, setPrintMode] = useState(false);
+
+  useEffect(() => {
+    if (!printMode) return;
+    const timer = window.setTimeout(() => window.print(), 100);
+    const onAfterPrint = () => setPrintMode(false);
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("afterprint", onAfterPrint);
+    };
+  }, [printMode]);
 
   const monthBounds = useMemo(() => getMonthBounds(year, month), [year, month]);
   const { employes } = useEmployes({ statut: "actif", limit: 500 });
@@ -154,14 +166,14 @@ export default function PresencePage() {
                   ev.stopPropagation();
                   setCheckoutPresence(p);
                 }}
-                className="text-xs font-semibold text-amber-700 hover:text-amber-900"
+                className="no-print text-xs font-semibold text-amber-700 hover:text-amber-900"
               >
                 + Sortie
               </button>
             ) : null}
             <Link
               href={`/employes/${p.employe_id}/presence`}
-              className="hidden text-xs font-medium text-[#2F5F9D] hover:text-[#1F3F73] sm:inline"
+              className="no-print hidden text-xs font-medium text-[#2F5F9D] hover:text-[#1F3F73] sm:inline"
               onClick={(e) => e.stopPropagation()}
             >
               Historique
@@ -198,7 +210,15 @@ export default function PresencePage() {
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="no-print flex flex-wrap items-center gap-2">
+          <Button
+            variant="ghost"
+            icon={<Printer className="h-4 w-4" />}
+            onClick={() => setPrintMode(true)}
+            disabled={presences.length === 0}
+          >
+            Imprimer
+          </Button>
           <Link href="/presence/absences">
             <Button variant="ghost" icon={<CalendarOff className="h-4 w-4" />}>
               Absences
@@ -210,7 +230,7 @@ export default function PresencePage() {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="no-print grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {viewMode === "day" ? (
           <>
             <KPICard title="Présents" value={dayRate.present} icon={CheckCircle2} color="green" index={0} />
@@ -235,7 +255,7 @@ export default function PresencePage() {
         )}
       </div>
 
-      <GlassCard className="p-5">
+      <GlassCard className="presence-print-root p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-base font-semibold text-slate-900">
@@ -243,7 +263,7 @@ export default function PresencePage() {
             </h2>
             <p className="text-xs text-text-secondary">{presences.length} enregistrement(s)</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="no-print flex flex-wrap items-center gap-2">
             <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
               <button
                 type="button"
@@ -330,7 +350,7 @@ export default function PresencePage() {
               data={presences}
               columns={columns}
               rowKey={(p) => p.id}
-              pagination
+              pagination={!printMode}
               pageSize={viewMode === "month" ? 15 : 10}
               emptyMessage={
                 viewMode === "day"

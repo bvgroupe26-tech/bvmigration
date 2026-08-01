@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -56,6 +56,12 @@ export default function PaiePage() {
   const { bulletins, isLoading, mutate } = usePaie(mois, annee, statutFilter === "all" ? undefined : statutFilter);
   const { stats, mutate: mutateStats } = usePaieStats(mois, annee);
   const { evolution } = usePaieEvolution();
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  function goToBulletins(filter: string) {
+    setStatutFilter(filter);
+    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   async function generate() {
     setGenerating(true);
@@ -293,8 +299,22 @@ export default function PaiePage() {
           index={0}
         />
         <KPICard title="Bulletins payés" value={stats?.payes ?? 0} icon={CheckCircle2} color="green" index={1} />
-        <KPICard title="En attente" value={stats?.en_attente ?? 0} icon={Clock} color="amber" index={2} />
-        <KPICard title="Total bulletins" value={stats?.total ?? 0} icon={FileText} color="blue" index={3} />
+        <KPICard
+          title="En attente"
+          value={stats?.en_attente ?? 0}
+          icon={Clock}
+          color="amber"
+          index={2}
+          onClick={() => goToBulletins("en_attente")}
+        />
+        <KPICard
+          title="Total bulletins"
+          value={stats?.total ?? 0}
+          icon={FileText}
+          color="blue"
+          index={3}
+          onClick={() => goToBulletins("all")}
+        />
       </div>
 
       <GlassCard className="p-6">
@@ -332,7 +352,7 @@ export default function PaiePage() {
       </GlassCard>
 
       <GlassCard className="p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div ref={tableRef} className="flex flex-wrap items-center justify-between gap-3">
           <SectionHeader
             title={`Bulletins · ${MOIS_NOMS[parseInt(mois, 10) - 1]} ${annee}`}
             subtitle={`${bulletins.length} bulletin(s)`}

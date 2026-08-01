@@ -41,7 +41,7 @@ export default function AdminAppShell({ user, children }: AdminAppShellProps) {
 
       <div
         className={cn(
-          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#F8FAFC]",
+          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#F8FAFC] print:ml-0",
           desktop && "ml-[260px]"
         )}
       >

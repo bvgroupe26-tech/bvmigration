@@ -57,7 +57,7 @@ export default function Sidebar({ user, desktop = false, className }: SidebarPro
   return (
     <aside
       className={cn(
-        "z-30 w-[260px] shrink-0 overflow-hidden bg-[#1F3F73] text-white shadow-[4px_0_24px_rgba(15,23,42,0.12)]",
+        "shell-sidebar z-30 w-[260px] shrink-0 overflow-hidden bg-[#1F3F73] text-white shadow-[4px_0_24px_rgba(15,23,42,0.12)]",
         desktop
           ? "fixed inset-y-0 left-0 flex h-[100dvh] flex-col"
           : "hidden",

@@ -502,10 +502,6 @@ body::before {
     padding: 0 !important;
   }
 
-  [class*="lg:ml-"] {
-    margin-left: 0 !important;
-  }
-
   .flex.h-\[100dvh\] {
     height: auto !important;
     max-height: none !important;
@@ -574,5 +570,20 @@ body::before {
 
   .bulletin-print-footer p + p {
     margin-top: 0.15rem !important;
+  }
+
+  .presence-print-root {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  .presence-print-root table {
+    font-size: 9pt;
+  }
+
+  .presence-print-root .overflow-x-auto {
+    overflow: visible !important;
   }
 }

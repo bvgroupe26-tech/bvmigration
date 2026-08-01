@@ -21,6 +21,7 @@ type KPICardProps = {
   format?: "number" | "currency" | "percent";
   suffix?: string;
   index?: number;
+  onClick?: () => void;
 };
 
 const COLOR_THEMES: Record<
@@ -150,6 +151,7 @@ export default function KPICard({
   format = "number",
   suffix,
   index = 0,
+  onClick,
 }: KPICardProps) {
   const [isClient, setIsClient] = useState(false);
   useEffect(() => {
@@ -172,8 +174,23 @@ export default function KPICard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
+      {...(onClick && {
+        role: "button",
+        tabIndex: 0,
+        onClick,
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        },
+      })}
+      className={onClick ? "cursor-pointer" : undefined}
     >
-      <GlassCard accent={theme.accent} className="p-5">
+      <GlassCard
+        accent={theme.accent}
+        className={cn("p-5", onClick && "transition hover:-translate-y-0.5 hover:shadow-lg")}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium uppercase tracking-wider text-text-secondary">
