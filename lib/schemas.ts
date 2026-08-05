@@ -229,6 +229,7 @@ export const paieSchema = z.object({
 export type PaieInput = z.infer<typeof paieSchema>;
 
 export const paieGenerateSchema = z.object({
+  employe_id: z.coerce.number().int().positive().optional(),
   mois: z.string().min(1).max(2),
   annee: z.coerce.number().int().min(2000).max(2100),
 });

@@ -10,6 +10,7 @@ import Button from "@/components/ui/Button";
 import PaieGenerateResultModal from "@/components/paie/PaieGenerateResultModal";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import { normalizeGeneratePaieResult, type GeneratePaieResult } from "@/lib/paie-utils";
+import { useEmployes } from "@/hooks/api";
 
 const MOIS_NOMS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 
@@ -18,16 +19,23 @@ export default function PaieGenerationPage() {
   const now = new Date();
   const [mois, setMois] = useState(String(now.getMonth() + 1).padStart(2, "0"));
   const [annee, setAnnee] = useState(now.getFullYear());
+  const [selectedEmployeId, setSelectedEmployeId] = useState<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<GeneratePaieResult | null>(null);
   const [resultOpen, setResultOpen] = useState(false);
 
+  const { employes } = useEmployes({ statut: "actif", limit: 500 });
+  const selectedEmploye = employes.find((e) => e.id === selectedEmployeId);
   const periodeLabel = `${MOIS_NOMS[parseInt(mois, 10) - 1]} ${annee}`;
 
   async function go() {
     setBusy(true);
     try {
-      const raw = await apiClient.post<unknown>("/paie", { mois, annee });
+      const raw = await apiClient.post<unknown>("/paie", {
+        mois,
+        annee,
+        employe_id: selectedEmployeId,
+      });
       const res = normalizeGeneratePaieResult(raw);
       setResult(res);
       setResultOpen(true);
@@ -58,7 +66,7 @@ export default function PaieGenerationPage() {
       </div>
 
       <GlassCard className="p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">Mois</label>
             <select value={mois} onChange={(e) => setMois(e.target.value)} className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900">
@@ -75,6 +83,21 @@ export default function PaieGenerationPage() {
               onChange={(e) => setAnnee(Number(e.target.value))}
               className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
             />
+          </div>
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">Employé</label>
+            <select
+              value={selectedEmployeId ?? ""}
+              onChange={(e) => setSelectedEmployeId(e.target.value ? Number(e.target.value) : undefined)}
+              className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+            >
+              <option value="">Tous les employés</option>
+              {employes.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.prenom} {e.nom}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <p className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">

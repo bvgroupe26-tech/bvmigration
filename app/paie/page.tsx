@@ -32,7 +32,7 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Skeleton from "@/components/ui/Skeleton";
 import PaieGenerateResultModal from "@/components/paie/PaieGenerateResultModal";
-import { usePaie, usePaieStats, usePaieEvolution } from "@/hooks/api";
+import { useEmployes, usePaie, usePaieStats, usePaieEvolution } from "@/hooks/api";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import { refreshNotificationsCache } from "@/hooks/useNotifications";
 import { formatProrata, normalizeGeneratePaieResult, type GeneratePaieResult } from "@/lib/paie-utils";
@@ -48,11 +48,14 @@ export default function PaiePage() {
   const [mois, setMois] = useState<string>(String(now.getMonth() + 1).padStart(2, "0"));
   const [annee, setAnnee] = useState<number>(now.getFullYear());
   const [statutFilter, setStatutFilter] = useState<string>("all");
+  const [selectedEmployeId, setSelectedEmployeId] = useState<number | undefined>(undefined);
   const [confirmGenerate, setConfirmGenerate] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generateResult, setGenerateResult] = useState<GeneratePaieResult | null>(null);
   const [resultModalOpen, setResultModalOpen] = useState(false);
 
+  const { employes } = useEmployes({ statut: "actif", limit: 500 });
+  const selectedEmploye = employes.find((e) => e.id === selectedEmployeId);
   const { bulletins, isLoading, mutate } = usePaie(mois, annee, statutFilter === "all" ? undefined : statutFilter);
   const { stats, mutate: mutateStats } = usePaieStats(mois, annee);
   const { evolution } = usePaieEvolution();
@@ -67,7 +70,11 @@ export default function PaiePage() {
     setGenerating(true);
     const periodeLabel = `${MOIS_NOMS[parseInt(mois, 10) - 1]} ${annee}`;
     try {
-      const raw = await apiClient.post<unknown>("/paie", { mois, annee });
+      const raw = await apiClient.post<unknown>("/paie", {
+        mois,
+        annee,
+        employe_id: selectedEmployeId,
+      });
       const res = normalizeGeneratePaieResult(raw);
       setGenerateResult(res);
       setResultModalOpen(true);
@@ -276,6 +283,18 @@ export default function PaiePage() {
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
+          <select
+            value={selectedEmployeId ?? ""}
+            onChange={(e) => setSelectedEmployeId(e.target.value ? Number(e.target.value) : undefined)}
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+          >
+            <option value="">Tous les employés</option>
+            {employes.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.prenom} {e.nom}
+              </option>
+            ))}
+          </select>
           <Button variant="ghost" icon={<Download className="h-4 w-4" />} onClick={exportExcel} disabled={bulletins.length === 0}>
             Exporter
           </Button>
@@ -399,7 +418,11 @@ export default function PaiePage() {
         onClose={() => setConfirmGenerate(false)}
         onConfirm={generate}
         title={`Générer la paie ${MOIS_NOMS[parseInt(mois, 10) - 1]} ${annee} ?`}
-        description={`Seuls les employés éligibles recevront un bulletin (actifs, ou inactifs avec fin de contrat dans le mois). Les autres seront listés avec le motif d'exclusion.`}
+        description={
+        selectedEmploye
+          ? `Générer un bulletin pour ${selectedEmploye.prenom} ${selectedEmploye.nom}. Les employés non sélectionnés ne seront pas traités.`
+          : "Seuls les employés éligibles recevront un bulletin (actifs, ou inactifs avec fin de contrat dans le mois). Les autres seront listés avec le motif d'exclusion."
+      }
         confirmLabel="Générer"
         variant="warning"
         loading={generating}
