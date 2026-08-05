@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Users, CheckCircle2, Clock, XCircle, Plus, CalendarOff, Printer } from "lucide-react";
@@ -13,6 +13,7 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import Skeleton from "@/components/ui/Skeleton";
 import PresenceForm from "@/components/forms/PresenceForm";
+import PresencePrintSheet from "@/components/presence/PresencePrintSheet";
 import { useEmployes, usePresences } from "@/hooks/api";
 import {
   computeDailyPresenceRate,
@@ -49,18 +50,6 @@ export default function PresencePage() {
   const [statutFilter, setStatutFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
   const [checkoutPresence, setCheckoutPresence] = useState<Presence | null>(null);
-  const [printMode, setPrintMode] = useState(false);
-
-  useEffect(() => {
-    if (!printMode) return;
-    const timer = window.setTimeout(() => window.print(), 100);
-    const onAfterPrint = () => setPrintMode(false);
-    window.addEventListener("afterprint", onAfterPrint);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("afterprint", onAfterPrint);
-    };
-  }, [printMode]);
 
   const monthBounds = useMemo(() => getMonthBounds(year, month), [year, month]);
   const { employes } = useEmployes({ statut: "actif", limit: 500 });
@@ -71,13 +60,13 @@ export default function PresencePage() {
       ? {
           date,
           statut: statutFilter === "all" ? undefined : statutFilter,
-          limit: 500,
+          limit: 1000,
         }
       : {
           date_from: monthBounds.date_from,
           date_to: monthBounds.date_to,
           statut: statutFilter === "all" ? undefined : statutFilter,
-          limit: 500,
+          limit: 5000,
         };
 
   const { presences, isLoading, mutate } = usePresences(presenceFilters);
@@ -91,6 +80,30 @@ export default function PresencePage() {
     monthStats.total > 0
       ? Math.round(((monthStats.present + monthStats.retard) / monthStats.total) * 100)
       : 0;
+
+  const printablePresences = useMemo(
+    () => presences.filter((p) => !(p.heure_entree && !p.heure_sortie)),
+    [presences]
+  );
+  const printStats = useMemo(() => computePresenceStats(printablePresences), [printablePresences]);
+
+  const printSummary = {
+    effectif: viewMode === "day" ? activeCount : undefined,
+    present: printStats.present,
+    retard: printStats.retard,
+    absent: printStats.absent,
+    conge: printStats.conge,
+    mission: printStats.mission,
+    total: printStats.total,
+    tauxPct:
+      viewMode === "day"
+        ? activeCount > 0
+          ? Math.round(((printStats.present + printStats.retard) / activeCount) * 100)
+          : 0
+        : printStats.total > 0
+          ? Math.round(((printStats.present + printStats.retard) / printStats.total) * 100)
+          : 0,
+  };
 
   const subtitle =
     viewMode === "day"
@@ -194,7 +207,7 @@ export default function PresencePage() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="flex flex-wrap items-center justify-between gap-3"
+        className="flex flex-wrap items-center justify-between gap-3 print:hidden"
       >
         <div>
           <h1 className="font-display text-[28px] font-bold tracking-tight text-slate-900">
@@ -214,7 +227,7 @@ export default function PresencePage() {
           <Button
             variant="ghost"
             icon={<Printer className="h-4 w-4" />}
-            onClick={() => setPrintMode(true)}
+            onClick={() => window.print()}
             disabled={presences.length === 0}
           >
             Imprimer
@@ -255,7 +268,7 @@ export default function PresencePage() {
         )}
       </div>
 
-      <GlassCard className="presence-print-root p-5">
+      <GlassCard className="p-5 print:hidden">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-base font-semibold text-slate-900">
@@ -350,7 +363,7 @@ export default function PresencePage() {
               data={presences}
               columns={columns}
               rowKey={(p) => p.id}
-              pagination={!printMode}
+              pagination
               pageSize={viewMode === "month" ? 15 : 10}
               emptyMessage={
                 viewMode === "day"
@@ -361,6 +374,14 @@ export default function PresencePage() {
           )}
         </div>
       </GlassCard>
+
+      <div className="hidden print:block">
+        <PresencePrintSheet
+          presences={printablePresences}
+          periodLabel={subtitle}
+          summary={printSummary}
+        />
+      </div>
 
       <Modal
         open={showAdd}
