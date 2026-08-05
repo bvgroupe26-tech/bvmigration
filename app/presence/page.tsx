@@ -81,29 +81,28 @@ export default function PresencePage() {
       ? Math.round(((monthStats.present + monthStats.retard) / monthStats.total) * 100)
       : 0;
 
-  const printablePresences = useMemo(
-    () => presences.filter((p) => !(p.heure_entree && !p.heure_sortie)),
-    [presences]
-  );
-  const printStats = useMemo(() => computePresenceStats(printablePresences), [printablePresences]);
-
-  const printSummary = {
-    effectif: viewMode === "day" ? activeCount : undefined,
-    present: printStats.present,
-    retard: printStats.retard,
-    absent: printStats.absent,
-    conge: printStats.conge,
-    mission: printStats.mission,
-    total: printStats.total,
-    tauxPct:
-      viewMode === "day"
-        ? activeCount > 0
-          ? Math.round(((printStats.present + printStats.retard) / activeCount) * 100)
-          : 0
-        : printStats.total > 0
-          ? Math.round(((printStats.present + printStats.retard) / printStats.total) * 100)
-          : 0,
-  };
+  const printSummary =
+    viewMode === "day"
+      ? {
+          effectif: activeCount,
+          present: dayRate.present,
+          retard: dayRate.retard,
+          absent: dayRate.absent,
+          conge: dayRate.conge,
+          mission: dayRate.mission,
+          total: presences.length,
+          tauxPct: dayRate.tauxPct,
+        }
+      : {
+          effectif: undefined,
+          present: monthStats.present,
+          retard: monthStats.retard,
+          absent: monthStats.absent,
+          conge: monthStats.conge,
+          mission: monthStats.mission,
+          total: monthStats.total,
+          tauxPct: monthTaux,
+        };
 
   const subtitle =
     viewMode === "day"
@@ -377,7 +376,7 @@ export default function PresencePage() {
 
       <div className="hidden print:block">
         <PresencePrintSheet
-          presences={printablePresences}
+          presences={presences}
           periodLabel={subtitle}
           summary={printSummary}
         />
