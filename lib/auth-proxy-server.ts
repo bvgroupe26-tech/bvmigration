@@ -9,6 +9,7 @@ const DEFAULT_PROD_API = "https://bv-groupe.onrender.com";
 
 export const REFRESH_COOKIE_NAME = "refresh_token";
 const TOKEN_MAX_AGE = 60 * 60 * 24 * 7;
+const UPSTREAM_TIMEOUT_MS = 30_000;
 
 /** URL absolue de l'API Nest (côté serveur Next uniquement). */
 export function getNestApiBase(): string {
@@ -77,7 +78,7 @@ function extractAccessTokenFromBody(body: string): string | null {
 async function setAccessTokenCookie(token: string): Promise<void> {
   const jar = await cookies();
   jar.set(TOKEN_COOKIE_NAME, token, {
-    httpOnly: false,
+    httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
@@ -145,13 +146,34 @@ export async function proxyAuthToNest(
     headers.set("Content-Type", "application/json");
   }
 
-  const upstream = await fetch(`${getNestApiBase()}${path}`, {
-    ...fetchInit,
-    headers,
-    cache: "no-store",
-  });
+  // Inférieur au timeout client (35 s) pour que le navigateur reçoive un 503 propre plutôt qu'un abort.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
-  const body = await upstream.text();
+  let upstream: Response;
+  let body: string;
+  try {
+    upstream = await fetch(`${getNestApiBase()}${path}`, {
+      ...fetchInit,
+      headers,
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    body = await upstream.text();
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "AbortError";
+    return NextResponse.json(
+      {
+        ok: false,
+        error: timedOut
+          ? "Le serveur met du temps à répondre (démarrage en cours). Réessayez dans un instant."
+          : "Serveur d'authentification injoignable.",
+      },
+      { status: 503, headers: { "Retry-After": "5" } }
+    );
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (clearRefreshCookie) {
     await clearAuthCookies();

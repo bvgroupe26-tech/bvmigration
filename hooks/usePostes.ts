@@ -1,53 +1,62 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import useSWR from "swr";
+import { getUserErrorMessage } from "@/lib/fetcher";
 import {
-  addStoredPoste,
-  mergePostesFromStrings,
-  readStoredPostes,
-  removeStoredPoste,
+  POSTES_REFERENTIEL_PATH,
+  addPosteReferentiel,
+  fetchPostesReferentiel,
+  migrateLegacyPostes,
+  removePosteReferentiel,
 } from "@/lib/postes-referentiel";
-import { useEmployes } from "@/hooks/api";
 
+/** Référentiel des postes partagé (base de données). Les postes des fiches employé y sont fusionnés côté API. */
 export function usePostes() {
-  const [postes, setPostes] = useState<string[]>([]);
-  const [ready, setReady] = useState(false);
-  const { employes, isLoading: loadingEmployes } = useEmployes({ limit: 500 });
-
-  const refresh = useCallback(() => {
-    setPostes(readStoredPostes());
-    setReady(true);
-  }, []);
+  const { data, error, isLoading, mutate } = useSWR<string[]>(
+    POSTES_REFERENTIEL_PATH,
+    fetchPostesReferentiel,
+    { revalidateOnFocus: false }
+  );
+  const migrated = useRef(false);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (!data || migrated.current) return;
+    migrated.current = true;
+    migrateLegacyPostes(data)
+      .then((next) => {
+        if (next) void mutate(next, { revalidate: false });
+      })
+      .catch(() => {
+        /* migration best-effort : retentée au prochain chargement si le stockage local subsiste */
+        migrated.current = false;
+      });
+  }, [data, mutate]);
 
-  useEffect(() => {
-    if (!employes.length) return;
-    const merged = mergePostesFromStrings(employes.map((e) => e.poste));
-    setPostes(merged);
-    setReady(true);
-  }, [employes]);
+  const addPoste = useCallback(
+    async (label: string) => {
+      const next = await addPosteReferentiel(label);
+      await mutate(next, { revalidate: false });
+      return next;
+    },
+    [mutate]
+  );
 
-  const addPoste = useCallback((label: string) => {
-    const next = addStoredPoste(label);
-    setPostes(next);
-    return next;
-  }, []);
-
-  const removePoste = useCallback((label: string) => {
-    const next = removeStoredPoste(label);
-    setPostes(next);
-    return next;
-  }, []);
+  const removePoste = useCallback(
+    async (label: string) => {
+      const next = await removePosteReferentiel(label);
+      await mutate(next, { revalidate: false });
+      return next;
+    },
+    [mutate]
+  );
 
   return {
-    postes,
-    isLoading: !ready || loadingEmployes,
-    error: null as string | null,
+    postes: data ?? [],
+    isLoading,
+    error: error ? getUserErrorMessage(error) : null,
     addPoste,
     removePoste,
-    refresh,
+    refresh: () => mutate(),
   };
 }

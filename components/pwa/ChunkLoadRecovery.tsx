@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 const STORAGE_KEY = "bv-chunk-reload";
+const CLEAR_FLAG_AFTER_MS = 10_000;
 
 function isChunkLoadFailure(message: string): boolean {
   return (
@@ -19,8 +20,18 @@ function isChunkLoadFailure(message: string): boolean {
  */
 export default function ChunkLoadRecovery() {
   useEffect(() => {
+    // Page chargée sans erreur pendant quelques secondes : on réarme la récupération pour le prochain déploiement.
+    const clearFlagTimer = window.setTimeout(() => {
+      try {
+        sessionStorage.removeItem(STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+    }, CLEAR_FLAG_AFTER_MS);
+
     const tryRecover = (message: string) => {
       if (!isChunkLoadFailure(message)) return;
+      window.clearTimeout(clearFlagTimer);
       try {
         const already = sessionStorage.getItem(STORAGE_KEY);
         if (already) return;
@@ -45,6 +56,7 @@ export default function ChunkLoadRecovery() {
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onRejection);
     return () => {
+      window.clearTimeout(clearFlagTimer);
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onRejection);
     };

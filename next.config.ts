@@ -1,75 +1,41 @@
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
 
-const OFFLINE_ASSETS_REVISION = "10";
+// Incrémenter pour forcer la purge des caches des anciens service workers.
+const SW_CACHE_VERSION = "v11";
 
 const withPWA = withPWAInit({
   dest: "public",
-  disable: process.env.DISABLE_PWA === "true",
+  disable: process.env.NODE_ENV === "development" || process.env.DISABLE_PWA === "true",
   register: true,
   sw: "sw.js",
   customWorkerSrc: "worker",
   customWorkerDest: "public",
   cacheOnFrontEndNav: true,
-  /** Désactivé : évite de servir une mauvaise page HTML en cache sur les routes dynamiques (/employee/paie/:id). */
   aggressiveFrontEndNavCaching: false,
   reloadOnOnline: true,
   extendDefaultRuntimeCaching: true,
+  // Repli uniquement quand la navigation échoue réellement (pas un app shell servi pour toute route).
   fallbacks: {
     document: "/offline",
   },
   workboxOptions: {
     disableDevLogs: true,
-    navigateFallback: "/offline",
-    navigateFallbackDenylist: [
-      /^\/api\//,
-      /^\/_next\//,
-      /^\/login/,
-      /^\/administration\//,
-      /^\/manifest\.webmanifest$/,
-      /^\/icons\//,
-      /^\/favicon/,
-      /^\/employee\/paie\//,
-      /^\/paie\/\d+/,
-      /\/.*\.[a-zA-Z0-9]+$/,
-    ],
-    additionalManifestEntries: [
-      { url: "/", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/offline", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/login", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/dashboard", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/employes", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/employes/nouveau", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/presence", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/paie", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/budget", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/recrutement", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/notifications", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/profile", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/employee/dashboard", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/employee/presence", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/employee/leaves", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/employee/documents", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/employee/profile", revision: OFFLINE_ASSETS_REVISION },
-      { url: "/employee/notifications", revision: OFFLINE_ASSETS_REVISION },
-    ],
+    cacheId: `bv-rh-${SW_CACHE_VERSION}`,
+    cleanupOutdatedCaches: true,
+    // Seule la page hors-ligne est pré-cachée : les pages HTML pré-cachées pointaient vers des chunks supprimés après déploiement.
+    additionalManifestEntries: [{ url: "/offline", revision: SW_CACHE_VERSION }],
     runtimeCaching: [
       {
         urlPattern: ({ url }) => url.pathname.startsWith("/api/auth/"),
         handler: "NetworkOnly",
       },
       {
+        // Données authentifiées : jamais en cache SW (clé = URL seule, ignore Authorization).
         urlPattern: ({ sameOrigin, url }) =>
-          sameOrigin && url.pathname.startsWith("/api/nest/"),
-        handler: "NetworkFirst",
-        options: {
-          cacheName: "api-nest-cache",
-          networkTimeoutSeconds: 15,
-          expiration: {
-            maxEntries: 80,
-            maxAgeSeconds: 3600,
-          },
-        },
+          sameOrigin &&
+          (url.pathname.startsWith("/api/nest/") || url.pathname.startsWith("/api/set-token")),
+        handler: "NetworkOnly",
       },
       {
         urlPattern: /\/_next\/data\/.*\.json$/i,

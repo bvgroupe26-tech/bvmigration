@@ -13,30 +13,52 @@ import {
 import {
   ensureValidAccessToken,
   getAccessToken,
-  getIsRefreshing,
+  isRefreshAuthRejected,
   logout,
   refreshAccessToken,
 } from "@/lib/authClient";
 import { shouldRefreshAccessToken } from "@/lib/session";
 import type { SyncQueueMethod } from "@/lib/db/types";
-import {
-  isOfflineRetryableError,
-  OfflineQueuedError,
-  queueMutation,
-} from "@/lib/sync/syncManager";
+import { OfflineQueuedError, queueMutation } from "@/lib/sync/syncManager";
 
 export type ApiResponse<T> = { ok: true; data: T } | { ok: false; error: string };
 
 export { OfflineQueuedError } from "@/lib/sync/syncManager";
 
+/** Échec réseau réel (pas de réponse HTTP), distinct d'une erreur métier renvoyée par l'API. */
+type ApiFailure = { ok: false; error: string; networkFailure?: boolean };
+
+/**
+ * Paie et changements de statut : un rejeu différé pourrait écraser une décision prise entre-temps
+ * (bulletin payé/annulé, absence validée/refusée). Ces actions doivent échouer franchement.
+ */
+const NON_QUEUEABLE_PATH_PATTERNS: RegExp[] = [
+  /^\/paie(\/|$|\?)/,
+  /^\/absences\/\d+(\/|$)/,
+  /\/statut(\/|$)/,
+  /\/(valider|approuver|refuser|rejeter|annuler)(\/|$)/,
+];
+
+function isQueueablePath(path: string): boolean {
+  if (isAuthApiPath(path)) return false;
+  return !NON_QUEUEABLE_PATH_PATTERNS.some((pattern) => pattern.test(path));
+}
+
+function isDeviceOffline(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
 async function maybeQueueOfflineMutation(
   path: string,
   method: SyncQueueMethod,
   body: unknown,
-  errorMessage: string
+  failure: ApiFailure
 ): Promise<never> {
-  if (isAuthApiPath(path) || !isOfflineRetryableError(errorMessage)) {
-    throw new Error(errorMessage);
+  // Une réponse HTTP (même 502/504 sur cold start Render) signifie que le serveur a peut-être
+  // traité la requête : on ne la rejoue pas. Seul un fetch sans réponse (TypeError) ou un appareil hors ligne compte.
+  const reallyOffline = failure.networkFailure === true || isDeviceOffline();
+  if (!reallyOffline || !isQueueablePath(path)) {
+    throw new Error(failure.error);
   }
 
   await queueMutation(method, path, body);
@@ -46,25 +68,6 @@ async function maybeQueueOfflineMutation(
 
 function getBaseUrl(): string {
   return resolveApiBaseUrl();
-}
-
-let isInterceptorRefreshing = false;
-let refreshWaiters: Array<{ resolve: () => void; reject: (error: unknown) => void }> = [];
-
-function subscribeRefresh(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    refreshWaiters.push({ resolve, reject });
-  });
-}
-
-function notifyRefreshSuccess(): void {
-  refreshWaiters.forEach(({ resolve }) => resolve());
-  refreshWaiters = [];
-}
-
-function notifyRefreshFailure(error: unknown): void {
-  refreshWaiters.forEach(({ reject }) => reject(error));
-  refreshWaiters = [];
 }
 
 /** Avant chaque appel API : renouveler si le JWT court expire bientôt. */
@@ -79,37 +82,22 @@ async function maybeProactiveRefresh(path: string): Promise<void> {
   }
 }
 
-async function ensureFreshAccessToken(path: string): Promise<boolean> {
-  if (isAuthApiPath(path)) return false;
+type RefreshOutcome = "refreshed" | "rejected" | "transient";
 
-  if (getIsRefreshing()) {
-    try {
-      await refreshAccessToken();
-      return Boolean(getAccessToken());
-    } catch {
-      return false;
-    }
-  }
-
-  if (isInterceptorRefreshing) {
-    try {
-      await subscribeRefresh();
-      return Boolean(getAccessToken());
-    } catch {
-      return false;
-    }
-  }
-
-  isInterceptorRefreshing = true;
+/** refreshAccessToken déduplique déjà les appels concurrents (mémoire + verrou inter-onglets). */
+async function ensureFreshAccessToken(path: string): Promise<RefreshOutcome> {
+  if (isAuthApiPath(path)) return "transient";
   try {
     await refreshAccessToken();
-    notifyRefreshSuccess();
-    return true;
+    return "refreshed";
   } catch (error) {
-    notifyRefreshFailure(error);
-    return false;
-  } finally {
-    isInterceptorRefreshing = false;
+    return isRefreshAuthRejected(error) ? "rejected" : "transient";
+  }
+}
+
+async function logoutIfOutsideLogin(): Promise<void> {
+  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+    await logout();
   }
 }
 
@@ -153,78 +141,76 @@ export async function apiFetch<T>(
   options: RequestInit = {},
   retryOnUnauthorized = true
 ): Promise<ApiResponse<T>> {
+  return apiFetchInternal<T>(path, options, retryOnUnauthorized);
+}
+
+async function apiFetchInternal<T>(
+  path: string,
+  options: RequestInit,
+  retryOnUnauthorized: boolean
+): Promise<ApiResponse<T> | (ApiFailure & { ok: false })> {
   await maybeProactiveRefresh(path);
 
   const url = path.startsWith("http") ? path : `${getBaseUrl()}${path}`;
   const headers = buildHeaders(options, true);
 
+  let res: Response;
   try {
-    const res = await fetch(url, {
+    res = await fetch(url, {
       ...options,
       headers,
       credentials: "include",
       cache: "no-store",
     });
-
-    if (res.status === 401 && retryOnUnauthorized && !isAuthApiPath(path)) {
-      const refreshed = await ensureFreshAccessToken(path);
-      if (refreshed) {
-        return apiFetch<T>(path, options, false);
-      }
-      if (
-        !getAccessToken() &&
-        typeof window !== "undefined" &&
-        !window.location.pathname.startsWith("/login")
-      ) {
-        await logout();
-      }
-      return parseResponse<T>(res, path);
-    }
-
-    return parseResponse<T>(res, path);
   } catch (err) {
-    return { ok: false, error: normalizeNetworkError(err) };
+    return { ok: false, error: normalizeNetworkError(err), networkFailure: true };
   }
+
+  if (res.status === 401 && retryOnUnauthorized && !isAuthApiPath(path)) {
+    const outcome = await ensureFreshAccessToken(path);
+    if (outcome === "refreshed") {
+      return apiFetchInternal<T>(path, options, false);
+    }
+    // Seul un refus explicite du refresh déconnecte ; un timeout / cold start garde la session.
+    if (outcome === "rejected") {
+      await logoutIfOutsideLogin();
+    }
+  }
+
+  return parseResponse<T>(res, path);
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
-  const result = await apiFetch<T>(path);
+  const result = await apiFetchInternal<T>(path, {}, true);
   if (!result.ok) throw new Error(result.error);
   return result.data;
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
-  const result = await apiFetch<T>(path, {
-    method: "POST",
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!result.ok) {
-    await maybeQueueOfflineMutation(path, "POST", body, result.error);
-  }
-  if (result.ok) return result.data;
-  throw new Error("Unreachable");
+  const result = await apiFetchInternal<T>(
+    path,
+    { method: "POST", body: body ? JSON.stringify(body) : undefined },
+    true
+  );
+  if (!result.ok) return maybeQueueOfflineMutation(path, "POST", body, result);
+  return result.data;
 }
 
 export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
-  const result = await apiFetch<T>(path, {
-    method: "PUT",
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!result.ok) {
-    await maybeQueueOfflineMutation(path, "PUT", body, result.error);
-  }
-  if (result.ok) return result.data;
-  throw new Error("Unreachable");
+  const result = await apiFetchInternal<T>(
+    path,
+    { method: "PUT", body: body ? JSON.stringify(body) : undefined },
+    true
+  );
+  if (!result.ok) return maybeQueueOfflineMutation(path, "PUT", body, result);
+  return result.data;
 }
 
 export async function apiDelete<T>(path: string): Promise<T> {
   const deletePath = `${path}/delete`;
-  const result = await apiFetch<T>(deletePath, { method: "POST" });
-  if (!result.ok) {
-    await maybeQueueOfflineMutation(deletePath, "POST", undefined, result.error);
-  }
-  if (result.ok) return result.data;
-  throw new Error("Unreachable");
+  const result = await apiFetchInternal<T>(deletePath, { method: "POST" }, true);
+  if (!result.ok) return maybeQueueOfflineMutation(deletePath, "POST", undefined, result);
+  return result.data;
 }
 
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
@@ -241,8 +227,9 @@ export async function apiUpload<T>(path: string, formData: FormData): Promise<T>
     });
 
     if (res.status === 401 && retryOnUnauthorized && !isAuthApiPath(path)) {
-      const refreshed = await ensureFreshAccessToken(path);
-      if (refreshed) return execute(false);
+      const outcome = await ensureFreshAccessToken(path);
+      if (outcome === "refreshed") return execute(false);
+      if (outcome === "rejected") await logoutIfOutsideLogin();
     }
 
     const json = await res.json().catch(() => null);
@@ -283,8 +270,9 @@ export async function apiDownload(path: string, fallbackName = "fichier"): Promi
     });
 
     if (res.status === 401 && retryOnUnauthorized && !isAuthApiPath(path)) {
-      const refreshed = await ensureFreshAccessToken(path);
-      if (refreshed) return execute(false);
+      const outcome = await ensureFreshAccessToken(path);
+      if (outcome === "refreshed") return execute(false);
+      if (outcome === "rejected") await logoutIfOutsideLogin();
     }
 
     if (res.status === 401) {

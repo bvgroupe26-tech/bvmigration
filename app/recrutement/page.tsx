@@ -174,7 +174,9 @@ export default function RecrutementPage() {
                   <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-3">
                     <span className="text-[11px] text-text-tertiary">
                       Publiée le{" "}
-                      {new Date(o.date_publication.replace(" ", "T")).toLocaleDateString("fr-FR")}
+                      {o.date_publication
+                        ? new Date(o.date_publication).toLocaleDateString("fr-FR")
+                        : "—"}
                     </span>
                     <div className="flex items-center gap-1">
                       {o.statut === "ouverte" && (

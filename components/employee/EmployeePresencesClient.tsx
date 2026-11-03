@@ -12,6 +12,7 @@ import {
   PRESENCE_STATUT_LABELS,
 } from "@/lib/presence-utils";
 import type { Presence } from "@/lib/types";
+import { localDateISO } from "@/lib/date-local";
 
 const MOIS = [
   "Janvier",
@@ -46,7 +47,7 @@ export default function EmployeePresencesClient() {
   );
 
   const stats = useMemo(() => computePresenceStats(presences), [presences]);
-  const today = now.toISOString().slice(0, 10);
+  const today = localDateISO(now);
   const todayEntry = presences.find((p) => p.date === today);
 
   if (isLoading) return <EmployeeLoading />;

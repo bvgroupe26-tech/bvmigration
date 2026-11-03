@@ -9,11 +9,13 @@ import Button from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
 import Skeleton from "@/components/ui/Skeleton";
 import { usePostes } from "@/hooks/usePostes";
+import { getUserErrorMessage } from "@/lib/fetcher";
+
 export default function PostesReferentielClient() {
   const { postes, isLoading, error, addPoste, removePoste } = usePostes();
   const [label, setLabel] = useState("");
 
-  function handleAdd(e: React.FormEvent) {
+  async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     const value = label.trim();
     if (value.length < 2) {
@@ -24,14 +26,22 @@ export default function PostesReferentielClient() {
       toast.error("Ce poste existe déjà.");
       return;
     }
-    addPoste(value);
-    setLabel("");
-    toast.success("Poste ajouté");
+    try {
+      await addPoste(value);
+      setLabel("");
+      toast.success("Poste ajouté");
+    } catch (err) {
+      toast.error(getUserErrorMessage(err));
+    }
   }
 
-  function handleRemove(name: string) {
-    removePoste(name);
-    toast.success("Poste retiré du référentiel");
+  async function handleRemove(name: string) {
+    try {
+      await removePoste(name);
+      toast.success("Poste retiré du référentiel");
+    } catch (err) {
+      toast.error(getUserErrorMessage(err));
+    }
   }
 
   return (

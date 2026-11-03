@@ -261,7 +261,7 @@ export default function PaiePage() {
         <div>
           <h1 className="font-display text-[28px] font-bold tracking-tight text-slate-900">Gestion de la paie</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            Bulletins de paie, calculs automatiques (CNSS 5.6% · Impôt 10%) et export Excel.
+            Bulletins de paie, CNSS et impôt calculés selon les taux de chaque fiche employé (ou saisis manuellement), et export Excel.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

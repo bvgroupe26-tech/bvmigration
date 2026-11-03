@@ -12,6 +12,7 @@ import {
 import { getMonthBounds, PRESENCE_STATUT_LABELS } from "@/lib/presence-utils";
 import { cn, getInitials, getAvatarGradient } from "@/lib/utils";
 import { EmployeeError, EmployeeLoading } from "@/components/employee/EmployeeState";
+import { localDateISO } from "@/lib/date-local";
 
 const shortcuts = [
   {
@@ -56,7 +57,7 @@ export default function EmployeeDashboardClient() {
     date_to: monthBounds.date_to,
     limit: 31,
   });
-  const today = now.toISOString().slice(0, 10);
+  const today = localDateISO(now);
   const todayPresence = presences.find((p) => p.date === today);
 
   if (loadingUser) return <EmployeeLoading />;

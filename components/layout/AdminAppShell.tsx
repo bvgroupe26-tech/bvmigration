@@ -8,6 +8,7 @@ import MobileNavDrawer from "@/components/layout/MobileNavDrawer";
 import PageTransition from "@/components/layout/PageTransition";
 import { ADMIN_MOBILE_DRAWER, ADMIN_MOBILE_TABS } from "@/lib/nav-config";
 import { useDesktopAdminShell } from "@/hooks/useDesktopAdminShell";
+import { filterNavForRole } from "@/lib/roles";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +27,7 @@ export default function AdminAppShell({ user, children }: AdminAppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const desktop = useDesktopAdminShell();
 
-  const bottomItems = ADMIN_MOBILE_TABS.map((item) =>
+  const bottomItems = filterNavForRole(ADMIN_MOBILE_TABS, user.role).map((item) =>
     item.href === "#menu" ? { ...item, onClick: () => setMenuOpen(true) } : item
   );
 
@@ -59,7 +60,7 @@ export default function AdminAppShell({ user, children }: AdminAppShellProps) {
           <MobileNavDrawer
             open={menuOpen}
             onClose={() => setMenuOpen(false)}
-            items={ADMIN_MOBILE_DRAWER}
+            items={filterNavForRole(ADMIN_MOBILE_DRAWER, user.role)}
             title="Modules RH"
           />
         </>

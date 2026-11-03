@@ -8,6 +8,7 @@ import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import { useEmployes } from "@/hooks/api";
+import { localDateISO } from "@/lib/date-local";
 
 type Props = {
   onSuccess?: () => void;
@@ -20,8 +21,8 @@ export default function AbsenceForm({ onSuccess, onCancel }: Props) {
     resolver: zodResolver(absenceSchema) as unknown as Resolver<AbsenceInput>,
     defaultValues: {
       employe_id: 0,
-      date_debut: new Date().toISOString().slice(0, 10),
-      date_fin: new Date().toISOString().slice(0, 10),
+      date_debut: localDateISO(),
+      date_fin: localDateISO(),
       type_absence: "conge_paye",
       justification: "",
       statut: "en_attente",

@@ -12,6 +12,7 @@ import Button from "@/components/ui/Button";
 import { useEmployes, usePresences } from "@/hooks/api";
 import { nowTimeValue, presenceToApiPayload } from "@/lib/presence-payload";
 import type { Presence } from "@/lib/types";
+import { localDateISO } from "@/lib/date-local";
 
 export type PresenceFormMode = "arrivee" | "sortie" | "complet";
 
@@ -57,7 +58,7 @@ export default function PresenceForm({
     resolver: zodResolver(arriveePresenceSchema) as unknown as Resolver<PresenceInput>,
     defaultValues: {
       employe_id: defaultEmployeId ?? 0,
-      date: defaultDate ?? new Date().toISOString().slice(0, 10),
+      date: defaultDate ?? localDateISO(),
       heure_entree: nowTimeValue(),
       heure_sortie: "",
       statut: "present",
@@ -70,7 +71,7 @@ export default function PresenceForm({
     resolver: zodResolver(sortieSchema) as unknown as Resolver<SortieInput>,
     defaultValues: {
       employe_id: defaultEmployeId ?? existingPresence?.employe_id ?? 0,
-      date: defaultDate ?? existingPresence?.date ?? new Date().toISOString().slice(0, 10),
+      date: defaultDate ?? existingPresence?.date ?? localDateISO(),
       heure_sortie: nowTimeValue(),
       heures_supplementaires: existingPresence?.heures_supplementaires ?? 0,
       justification: existingPresence?.justification ?? "",
@@ -81,7 +82,7 @@ export default function PresenceForm({
     resolver: zodResolver(presenceSchema) as unknown as Resolver<PresenceInput>,
     defaultValues: {
       employe_id: defaultEmployeId ?? 0,
-      date: defaultDate ?? new Date().toISOString().slice(0, 10),
+      date: defaultDate ?? localDateISO(),
       heure_entree: "08:00",
       heure_sortie: "17:30",
       statut: "present",
@@ -93,10 +94,10 @@ export default function PresenceForm({
   const sortieEmployeId = sortieForm.watch("employe_id");
   const sortieDate = sortieForm.watch("date");
 
+  const needsLookup =
+    mode === "sortie" && !existingPresence && Number(sortieEmployeId) > 0 && Boolean(sortieDate);
   const { presences: sortieLookup, isLoading: loadingSortie } = usePresences(
-    sortieEmployeId && sortieDate
-      ? { employe_id: Number(sortieEmployeId), date: sortieDate, limit: 5 }
-      : undefined
+    needsLookup ? { employe_id: Number(sortieEmployeId), date: sortieDate, limit: 5 } : null
   );
 
   const openPresence = useMemo(() => {
@@ -128,14 +129,20 @@ export default function PresenceForm({
     toast.success("Arrivée enregistrée");
   }
 
-  async function submitSortie(data: SortieInput) {
+  async function submitSortie(data: SortieInput): Promise<boolean> {
     if (!openPresence?.id) {
       toast.error("Aucune arrivée trouvée pour cet employé à cette date. Enregistrez d'abord l'arrivée.");
-      return;
+      return false;
     }
     if (openPresence.heure_sortie) {
       toast.error("La sortie est déjà enregistrée pour ce jour.");
-      return;
+      return false;
+    }
+    if (openPresence.heure_entree && data.heure_sortie <= openPresence.heure_entree) {
+      sortieForm.setError("heure_sortie", {
+        message: `La sortie doit être après l'arrivée (${openPresence.heure_entree}).`,
+      });
+      return false;
     }
     const payload = presenceToApiPayload({
       heure_sortie: data.heure_sortie,
@@ -144,9 +151,16 @@ export default function PresenceForm({
     });
     await apiClient.put<Presence>(`/presences/${openPresence.id}`, payload);
     toast.success("Sortie enregistrée");
+    return true;
   }
 
-  async function submitComplet(data: PresenceInput) {
+  async function submitComplet(data: PresenceInput): Promise<boolean> {
+    if (data.heure_entree && data.heure_sortie && data.heure_sortie <= data.heure_entree) {
+      completForm.setError("heure_sortie", {
+        message: "L'heure de sortie doit être après l'heure d'entrée.",
+      });
+      return false;
+    }
     const payload = presenceToApiPayload({
       employe_id: data.employe_id,
       date: data.date,
@@ -158,6 +172,7 @@ export default function PresenceForm({
     });
     await apiClient.post<Presence>("/presences", payload);
     toast.success("Présence enregistrée");
+    return true;
   }
 
   const onArrivee = arriveeForm.handleSubmit(async (data) => {
@@ -171,8 +186,7 @@ export default function PresenceForm({
 
   const onSortie = sortieForm.handleSubmit(async (data) => {
     try {
-      await submitSortie(data);
-      onSuccess?.();
+      if (await submitSortie(data)) onSuccess?.();
     } catch (err) {
       toast.error(getUserErrorMessage(err));
     }
@@ -180,8 +194,7 @@ export default function PresenceForm({
 
   const onComplet = completForm.handleSubmit(async (data) => {
     try {
-      await submitComplet(data);
-      onSuccess?.();
+      if (await submitComplet(data)) onSuccess?.();
     } catch (err) {
       toast.error(getUserErrorMessage(err));
     }

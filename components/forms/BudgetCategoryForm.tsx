@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { budgetCategorieSchema, type BudgetCategorieInput } from "@/lib/schemas";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
+import { stripEmpty } from "@/lib/rh-normalizers";
 import { Field, Input, Textarea } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import type { BudgetCategorie } from "@/lib/types";
@@ -35,7 +36,7 @@ export default function BudgetCategoryForm({ categorie, onSuccess, onCancel }: P
       onSubmit={handleSubmit(async (data) => {
         try {
           if (isEdit) await apiClient.put(`/budget/categories/${categorie.id}`, data);
-          else await apiClient.post("/budget/categories", data);
+          else await apiClient.post("/budget/categories", stripEmpty(data));
           toast.success(isEdit ? "Catégorie mise à jour" : "Catégorie créée");
           onSuccess?.();
         } catch (e) {

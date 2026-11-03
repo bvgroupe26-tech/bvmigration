@@ -1,4 +1,5 @@
 import type { StatistiquesSynthese } from "@/lib/types";
+import { localDateISO } from "@/lib/date-local";
 
 const MOIS_LABELS: Record<string, string> = {
   "01": "Janvier",
@@ -102,7 +103,7 @@ export function normalizeStatistiquesSynthese(raw: unknown): StatistiquesSynthes
     presence: {
       serie_mensuelle: [],
       aujourd_hui: {
-        date: now.toISOString().slice(0, 10),
+        date: localDateISO(now),
         present: num(presences.presents ?? presences.present),
         absent: num(presences.absents ?? presences.absent),
         retard: num(presences.retards ?? presences.retard),

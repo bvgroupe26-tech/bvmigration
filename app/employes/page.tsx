@@ -31,6 +31,7 @@ import EmployeForm from "@/components/forms/EmployeForm";
 import { useEmployes } from "@/hooks/api";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import type { Employe } from "@/lib/types";
+import { localDateISO } from "@/lib/date-local";
 
 const DEPARTEMENTS = ["Tech", "Commercial", "Marketing", "Finance", "RH", "Direction", "Produit", "Juridique"];
 
@@ -90,7 +91,7 @@ export default function EmployesPage() {
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Employes");
-      XLSX.writeFile(wb, `employes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      XLSX.writeFile(wb, `employes_${localDateISO()}.xlsx`);
       toast.success("Export Excel généré");
     } catch (err) {
       toast.error(getUserErrorMessage(err, "Impossible d'exporter les données."));

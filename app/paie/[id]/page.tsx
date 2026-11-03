@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { use } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -11,6 +11,7 @@ import { ArrowLeft, CheckCircle2, XCircle, Printer, Pencil, X } from "lucide-rea
 import Button from "@/components/ui/Button";
 import GlassCard from "@/components/ui/GlassCard";
 import Skeleton from "@/components/ui/Skeleton";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { Field, Input } from "@/components/ui/Field";
 import BulletinPaieSheet from "@/components/paie/BulletinPaieSheet";
 import { usePaieDetail } from "@/hooks/api";
@@ -24,6 +25,8 @@ export default function BulletinDetailPage({ params }: { params: Promise<{ id: s
   const { id } = use(params);
   const { bulletin, isLoading, mutate } = usePaieDetail(id);
   const [editing, setEditing] = useState(false);
+  const [pendingStatut, setPendingStatut] = useState<"paye" | "annule" | null>(null);
+  const [changingStatut, setChangingStatut] = useState(false);
 
   const {
     register,
@@ -60,29 +63,29 @@ export default function BulletinDetailPage({ params }: { params: Promise<{ id: s
   }, [bulletin, reset]);
 
   const w = watch();
-  const previewNet = useMemo(
-    () =>
-      calcSalaireNet({
-        salaire_base: Number(w.salaire_base) || 0,
-        prime_transport: Number(w.prime_transport) || 0,
-        prime_logement: Number(w.prime_logement) || 0,
-        prime_performance: Number(w.prime_performance) || 0,
-        autres_primes: Number(w.autres_primes) || 0,
-        cnss: Number(w.cnss) || 0,
-        impot: Number(w.impot) || 0,
-        autres_retenues: Number(w.autres_retenues) || 0,
-      }),
-    [w]
-  );
+  const previewNet = calcSalaireNet({
+    salaire_base: Number(w.salaire_base) || 0,
+    prime_transport: Number(w.prime_transport) || 0,
+    prime_logement: Number(w.prime_logement) || 0,
+    prime_performance: Number(w.prime_performance) || 0,
+    autres_primes: Number(w.autres_primes) || 0,
+    cnss: Number(w.cnss) || 0,
+    impot: Number(w.impot) || 0,
+    autres_retenues: Number(w.autres_retenues) || 0,
+  });
 
   async function changeStatut(statut: "paye" | "annule") {
+    setChangingStatut(true);
     try {
       await apiClient.put(`/paie/${id}`, { statut });
       toast.success(`Bulletin ${statut === "paye" ? "marqué payé" : "annulé"}`);
+      setPendingStatut(null);
       mutate();
       void refreshNotificationsCache();
     } catch (err) {
       toast.error(getUserErrorMessage(err));
+    } finally {
+      setChangingStatut(false);
     }
   }
 
@@ -125,10 +128,10 @@ export default function BulletinDetailPage({ params }: { params: Promise<{ id: s
               <Button variant="ghost" icon={<Pencil className="h-4 w-4" />} onClick={() => setEditing(true)}>
                 Modifier les montants
               </Button>
-              <Button variant="success" icon={<CheckCircle2 className="h-4 w-4" />} onClick={() => changeStatut("paye")}>
+              <Button variant="success" icon={<CheckCircle2 className="h-4 w-4" />} onClick={() => setPendingStatut("paye")}>
                 Marquer payé
               </Button>
-              <Button variant="danger" icon={<XCircle className="h-4 w-4" />} onClick={() => changeStatut("annule")}>
+              <Button variant="danger" icon={<XCircle className="h-4 w-4" />} onClick={() => setPendingStatut("annule")}>
                 Annuler le bulletin
               </Button>
             </>
@@ -191,6 +194,22 @@ export default function BulletinDetailPage({ params }: { params: Promise<{ id: s
       )}
 
       <BulletinPaieSheet bulletin={bulletin} />
+
+      <ConfirmDialog
+        open={pendingStatut !== null}
+        onClose={() => setPendingStatut(null)}
+        onConfirm={() => (pendingStatut ? changeStatut(pendingStatut) : undefined)}
+        loading={changingStatut}
+        variant={pendingStatut === "annule" ? "danger" : "warning"}
+        title={pendingStatut === "paye" ? "Marquer ce bulletin comme payé ?" : "Annuler ce bulletin ?"}
+        description={
+          pendingStatut === "paye"
+            ? "L'employé sera notifié et le bulletin deviendra visible dans son espace. Ses montants ne pourront plus être modifiés."
+            : "Le bulletin sera exclu de la masse salariale. Cette action ne se fait pas depuis un bulletin déjà payé, sauf par un administrateur."
+        }
+        confirmLabel={pendingStatut === "paye" ? "Marquer payé" : "Annuler le bulletin"}
+        cancelLabel="Retour"
+      />
     </div>
   );
 }

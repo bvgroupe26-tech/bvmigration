@@ -8,7 +8,6 @@ import {
   GraduationCap,
   Award,
   TrendingUp,
-  Users,
   Plus,
   Trash2,
   ChartLine,
@@ -16,7 +15,6 @@ import {
 import KPICard from "@/components/ui/KPICard";
 import Button from "@/components/ui/Button";
 import GlassCard from "@/components/ui/GlassCard";
-import StatBadge from "@/components/ui/StatBadge";
 import Avatar from "@/components/ui/Avatar";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";

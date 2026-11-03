@@ -150,6 +150,7 @@ export function normalizeAbsence(raw: unknown): Absence {
     employe_nom: nom ?? undefined,
     employe_prenom: prenom ?? undefined,
     employe_poste: poste,
+    ...(dureeJours > 0 ? { duree_jours: dureeJours } : {}),
   };
 }
 
@@ -193,13 +194,20 @@ const MOIS_LABELS: Record<string, string> = {
   "12": "Décembre",
 };
 
-export function absenceDureeJours(a: Pick<Absence, "date_debut" | "date_fin">): number {
-  const debut = new Date(a.date_debut);
-  const fin = new Date(a.date_fin);
-  if (Number.isNaN(debut.getTime()) || Number.isNaN(fin.getTime())) return 0;
-  debut.setHours(0, 0, 0, 0);
-  fin.setHours(0, 0, 0, 0);
-  return Math.floor((fin.getTime() - debut.getTime()) / 86400000) + 1;
+/** Durée en jours ouvrés (lundi→vendredi), comme le calcul du solde côté serveur. */
+export function absenceDureeJours(
+  a: Pick<Absence, "date_debut" | "date_fin"> & { duree_jours?: number }
+): number {
+  if (a.duree_jours && a.duree_jours > 0) return a.duree_jours;
+  const debut = Date.parse(`${a.date_debut.slice(0, 10)}T00:00:00Z`);
+  const fin = Date.parse(`${a.date_fin.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(debut) || Number.isNaN(fin) || fin < debut) return 0;
+  let count = 0;
+  for (let t = debut; t <= fin; t += 86400000) {
+    const day = new Date(t).getUTCDay();
+    if (day !== 0 && day !== 6) count++;
+  }
+  return count;
 }
 
 export function formatPeriodeAbsence(dateDebut: string, dateFin: string): string {

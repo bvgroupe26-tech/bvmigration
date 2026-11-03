@@ -53,7 +53,23 @@ export function canRoleAccessPath(
   const normalized = normalizeAppRole(role);
   if (!normalized) return false;
   if (isEmployeePath(pathname)) return hasEmployeePanelAccess(normalized, employeId);
-  return hasAdminPanelAccess(normalized);
+  if (!hasAdminPanelAccess(normalized)) return false;
+  if (normalized === "manager" && isHrOnlyPath(pathname)) return false;
+  return true;
+}
+
+/** Modules réservés admin/rh côté API (le manager reçoit 403). */
+const HR_ONLY_PREFIXES = ["/paie", "/budget", "/administration"];
+
+function isHrOnlyPath(pathname: string): boolean {
+  return HR_ONLY_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+export function filterNavForRole<T extends { href: string }>(
+  items: T[],
+  role: string | null | undefined
+): T[] {
+  return items.filter((item) => item.href.startsWith("#") || canRoleAccessPath(role, item.href));
 }
 
 /** Qui peut créer quel rôle de compte staff. */

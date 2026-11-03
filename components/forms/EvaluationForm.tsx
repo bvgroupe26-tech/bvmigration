@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { evaluationSchema, type EvaluationInput } from "@/lib/schemas";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
+import { stripEmpty } from "@/lib/rh-normalizers";
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import { useEmployes } from "@/hooks/api";
@@ -64,7 +65,7 @@ export default function EvaluationForm({ onSuccess, onCancel }: Props) {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      await apiClient.post("/evaluations", data);
+      await apiClient.post("/evaluations", stripEmpty(data));
       toast.success("Évaluation enregistrée");
       onSuccess?.();
     } catch (err) {

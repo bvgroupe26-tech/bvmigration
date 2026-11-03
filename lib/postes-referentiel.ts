@@ -1,66 +1,76 @@
-const STORAGE_KEY = "bv-postes-referentiel";
+import { apiClient } from "@/lib/fetcher";
 
-export const DEFAULT_POSTES = [
-  "Responsable RH",
-  "Chargé de recrutement",
-  "Comptable",
-  "Développeur",
-  "Développeur Senior",
-  "Chef de projet",
-  "Responsable commercial",
-  "Assistant administratif",
-  "Directeur général",
-  "Technicien support",
-];
+/** Ancien stockage local (avant le référentiel partagé en base). Lu une seule fois pour migration. */
+const LEGACY_STORAGE_KEY = "bv-postes-referentiel";
 
-function normalizeLabel(value: string): string {
+export const POSTES_REFERENTIEL_PATH = "/employes/postes/referentiel";
+
+export function normalizePosteLabel(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
 
-export function readStoredPostes(): string[] {
-  if (typeof window === "undefined") return [...DEFAULT_POSTES];
+function toSortedList(raw: unknown): string[] {
+  const items = Array.isArray(raw) ? raw : [];
+  const labels = items
+    .map((p) => {
+      if (typeof p === "string") return normalizePosteLabel(p);
+      if (p && typeof p === "object" && "label" in p) {
+        return normalizePosteLabel(String((p as { label: unknown }).label ?? ""));
+      }
+      return "";
+    })
+    .filter(Boolean);
+  return Array.from(new Set(labels)).sort((a, b) => a.localeCompare(b, "fr"));
+}
+
+export async function fetchPostesReferentiel(): Promise<string[]> {
+  return toSortedList(await apiClient.get<unknown>(POSTES_REFERENTIEL_PATH));
+}
+
+export async function addPosteReferentiel(label: string): Promise<string[]> {
+  return toSortedList(
+    await apiClient.post<unknown>(POSTES_REFERENTIEL_PATH, { label: normalizePosteLabel(label) })
+  );
+}
+
+export async function removePosteReferentiel(label: string): Promise<string[]> {
+  return toSortedList(
+    await apiClient.post<unknown>(`${POSTES_REFERENTIEL_PATH}/remove`, {
+      label: normalizePosteLabel(label),
+    })
+  );
+}
+
+/** Envoie au serveur les postes saisis localement sur cet appareil, puis efface le stockage local. */
+export async function migrateLegacyPostes(serverPostes: string[]): Promise<string[] | null> {
+  if (typeof window === "undefined") return null;
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [...DEFAULT_POSTES];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [...DEFAULT_POSTES];
-    return parsed
-      .map((p) => (typeof p === "string" ? normalizeLabel(p) : ""))
-      .filter(Boolean);
+    raw = localStorage.getItem(LEGACY_STORAGE_KEY);
   } catch {
-    return [...DEFAULT_POSTES];
+    return null;
   }
-}
+  if (!raw) return null;
 
-export function writeStoredPostes(postes: string[]): string[] {
-  const unique = Array.from(
-    new Set(postes.map(normalizeLabel).filter((p) => p.length >= 2))
-  ).sort((a, b) => a.localeCompare(b, "fr"));
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(unique));
+  let legacy: string[] = [];
+  try {
+    legacy = toSortedList(JSON.parse(raw));
+  } catch {
+    /* contenu illisible : on l'abandonne */
   }
-  return unique;
-}
 
-export function addStoredPoste(label: string): string[] {
-  const next = normalizeLabel(label);
-  if (!next) return readStoredPostes();
-  return writeStoredPostes([...readStoredPostes(), next]);
-}
-
-export function removeStoredPoste(label: string): string[] {
-  const key = normalizeLabel(label).toLowerCase();
-  return writeStoredPostes(readStoredPostes().filter((p) => p.toLowerCase() !== key));
-}
-
-export function mergePostesFromStrings(extra: (string | null | undefined)[]): string[] {
-  const current = readStoredPostes();
-  const merged = [...current];
-  for (const item of extra) {
-    const label = item ? normalizeLabel(item) : "";
-    if (label && !merged.some((p) => p.toLowerCase() === label.toLowerCase())) {
-      merged.push(label);
-    }
+  const known = new Set(serverPostes.map((p) => p.toLowerCase()));
+  let latest: string[] | null = null;
+  for (const label of legacy) {
+    if (label.length < 2 || known.has(label.toLowerCase())) continue;
+    latest = await addPosteReferentiel(label);
+    known.add(label.toLowerCase());
   }
-  return writeStoredPostes(merged);
+
+  try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  return latest;
 }

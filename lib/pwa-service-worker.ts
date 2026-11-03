@@ -58,11 +58,62 @@ async function registerDirectly(): Promise<ServiceWorkerRegistration> {
   return registration;
 }
 
+const SW_RELOAD_GUARD_KEY = "bv-sw-reloaded-at";
+const SW_RELOAD_MIN_INTERVAL_MS = 30_000;
+let updateWatcherInstalled = false;
+
+/**
+ * skipWaiting + clientsClaim : le nouveau SW prend la main sur un onglet ouvert et purge les anciens chunks.
+ * On recharge une fois pour repartir sur des assets cohérents, et on vérifie les MAJ au retour sur l'app.
+ */
+function installUpdateWatcher(): void {
+  if (updateWatcherInstalled) return;
+  updateWatcherInstalled = true;
+
+  const hadController = Boolean(navigator.serviceWorker.controller);
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    // Premier contrôle après installation initiale : rien de périmé à recharger.
+    if (!hadController) return;
+    // Le scriptURL est toujours /sw.js : la garde temporelle évite une boucle si deux SW s'enchaînent.
+    try {
+      const last = Number(sessionStorage.getItem(SW_RELOAD_GUARD_KEY) ?? 0);
+      if (Date.now() - last < SW_RELOAD_MIN_INTERVAL_MS) return;
+      sessionStorage.setItem(SW_RELOAD_GUARD_KEY, String(Date.now()));
+    } catch {
+      /* sessionStorage indisponible : on recharge quand même une fois */
+    }
+    window.location.reload();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    void navigator.serviceWorker
+      .getRegistration(SW_SCOPE)
+      .then((registration) => registration?.update())
+      .catch(() => {
+        /* hors ligne */
+      });
+  });
+}
+
+async function unregisterAllServiceWorkers(): Promise<void> {
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  await Promise.all(registrations.map((registration) => registration.unregister()));
+}
+
 /** Lance l'enregistrement /sw.js (appelé par le script inline + React). */
 export function startServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
     return Promise.resolve(null);
   }
+
+  // PWA désactivée en dev : un ancien /sw.js de build prod resterait sinon actif (comportements fantômes).
+  if (process.env.NODE_ENV === "development") {
+    return unregisterAllServiceWorkers().then(() => null, () => null);
+  }
+
+  installUpdateWatcher();
 
   if (window.__bvSwRegisterPromise) {
     return window.__bvSwRegisterPromise.catch(() => bootstrapServiceWorker());

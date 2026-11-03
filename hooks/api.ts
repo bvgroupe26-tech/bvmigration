@@ -18,7 +18,7 @@ import {
 } from "@/lib/paie-utils";
 import { normalizeEmploye, normalizeEmployeList } from "@/lib/employe-utils";
 import { normalizeAdminUserList, type AdminUserRecord } from "@/lib/users-admin-api";
-import { normalizePresence, normalizePresenceList } from "@/lib/presence-utils";
+import { normalizePresenceList } from "@/lib/presence-utils";
 import {
   enrichAbsencesWithEmployes,
   normalizeAbsenceList,
@@ -26,6 +26,20 @@ import {
 } from "@/lib/absence-utils";
 import { normalizeBudgetSynthese } from "@/lib/budget-utils";
 import { normalizeStatistiquesSynthese } from "@/lib/statistiques-utils";
+import { localDateISO } from "@/lib/date-local";
+import {
+  normalizeBudgetCategorieList,
+  normalizeBudgetDepenseList,
+  normalizeBudgetEnveloppeList,
+  normalizeCandidatureList,
+  normalizeCompetenceList,
+  normalizeEvaluationList,
+  normalizeFormationList,
+  normalizeOffre,
+  normalizeOffreList,
+  normalizeOffresStats,
+  type OffresStats,
+} from "@/lib/rh-normalizers";
 import type {
   Employe,
   Presence,
@@ -99,15 +113,24 @@ async function fetchPresences(url: string): Promise<Presence[]> {
   return normalizePresenceList(raw);
 }
 
-export function usePresences(filters?: {
+export type PresencesFilters = {
   date?: string;
   employe_id?: number;
   statut?: string;
   date_from?: string;
   date_to?: string;
   limit?: number;
-}) {
-  const url = `/presences${qs(filters ?? {})}`;
+  take?: number;
+  skip?: number;
+};
+
+/** `filters === null` ou `options.enabled === false` : aucune requête (évite de charger toute la table). */
+export function usePresences(
+  filters?: PresencesFilters | null,
+  options?: { enabled?: boolean }
+) {
+  const enabled = filters !== null && options?.enabled !== false;
+  const url = enabled ? `/presences${qs(filters ?? {})}` : null;
   const { data, error, isLoading, mutate } = useSWR<Presence[]>(url, fetchPresences, SHORT);
   return { presences: data ?? [], isLoading, error, mutate };
 }
@@ -138,7 +161,7 @@ const EMPTY_TODAY_COUNTS: PresencesTodayCounts = {
 function normalizePresencesToday(raw: unknown): PresencesTodayPayload | undefined {
   if (raw == null) return undefined;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateISO();
 
   if (typeof raw === "object" && !Array.isArray(raw)) {
     const o = raw as Record<string, unknown>;
@@ -215,12 +238,14 @@ async function fetchAbsences(url: string): Promise<Absence[]> {
   const raw = await fetcher<unknown>(url);
   let list = normalizeAbsenceList(raw);
 
-  try {
-    const empsRaw = await fetcher<unknown>("/employes?limit=500");
-    const employes = normalizeEmployeList(empsRaw);
-    list = enrichAbsencesWithEmployes(list, employes);
-  } catch {
-    /* liste employés optionnelle */
+  // L'API inclut l'employé ; repli seulement pour une ancienne réponse sans noms.
+  if (list.some((a) => !a.employe_nom)) {
+    try {
+      const empsRaw = await fetcher<unknown>("/employes?limit=500");
+      list = enrichAbsencesWithEmployes(list, normalizeEmployeList(empsRaw));
+    } catch {
+      /* liste employés optionnelle */
+    }
   }
 
   if (process.env.NODE_ENV === "development" && list.length > 0) {
@@ -305,48 +330,74 @@ export function usePaieDetail(id: number | string | null) {
 }
 
 // ============ Recrutement ============
+async function fetchOffres(url: string): Promise<Offre[]> {
+  return normalizeOffreList(await fetcher<unknown>(url));
+}
+
+async function fetchOffreAvecCandidatures(
+  id: string
+): Promise<Offre & { candidatures: Candidature[] }> {
+  const [offreRaw, candidaturesRaw] = await Promise.all([
+    fetcher<unknown>(`/offres/${id}`),
+    fetcher<unknown>(`/candidatures${qs({ offre_id: id })}`),
+  ]);
+  const candidatures = normalizeCandidatureList(candidaturesRaw);
+  const offre = normalizeOffre(offreRaw);
+  return { ...offre, candidats_count: candidatures.length, candidatures };
+}
+
 export function useOffres(filters?: { statut?: string }) {
   const url = `/offres${qs(filters ?? {})}`;
-  const { data, error, isLoading, mutate } = useSWR<Offre[]>(url, fetcher, SHORT);
+  const { data, error, isLoading, mutate } = useSWR<Offre[]>(url, fetchOffres, SHORT);
   return { offres: data ?? [], isLoading, error, mutate };
 }
 
 export function useOffre(id: number | string | null) {
   const { data, error, isLoading, mutate } = useSWR<Offre & { candidatures: Candidature[] }>(
-    id ? `/offres/${id}` : null,
-    fetcher,
+    id ? ["offre-detail", String(id)] : null,
+    ([, offreId]: [string, string]) => fetchOffreAvecCandidatures(offreId),
     SHORT
   );
   return { offre: data, isLoading, error, mutate };
 }
 
 export function useOffresStats() {
-  const { data, error, isLoading, mutate } = useSWR<{
-    ouvertes: number;
-    fermees: number;
-    pourvues: number;
-    total: number;
-    total_candidats: number;
-  }>("/offres/stats", fetcher, SHORT);
+  const { data, error, isLoading, mutate } = useSWR<OffresStats>(
+    "/offres/stats",
+    async (url: string) => normalizeOffresStats(await fetcher<unknown>(url)),
+    SHORT
+  );
   return { stats: data, isLoading, error, mutate };
 }
 
 // ============ Compétences ============
 export function useCompetences(employe_id?: number) {
   const url = `/competences${qs({ employe_id })}`;
-  const { data, error, isLoading, mutate } = useSWR<Competence[]>(url, fetcher, SHORT);
+  const { data, error, isLoading, mutate } = useSWR<Competence[]>(
+    url,
+    async (u: string) => normalizeCompetenceList(await fetcher<unknown>(u)),
+    SHORT
+  );
   return { competences: data ?? [], isLoading, error, mutate };
 }
 
 export function useFormations(employe_id?: number) {
   const url = `/formations${qs({ employe_id })}`;
-  const { data, error, isLoading, mutate } = useSWR<Formation[]>(url, fetcher, SHORT);
+  const { data, error, isLoading, mutate } = useSWR<Formation[]>(
+    url,
+    async (u: string) => normalizeFormationList(await fetcher<unknown>(u)),
+    SHORT
+  );
   return { formations: data ?? [], isLoading, error, mutate };
 }
 
 export function useEvaluations(filters?: { employe_id?: number; periode?: string }) {
   const url = `/evaluations${qs(filters ?? {})}`;
-  const { data, error, isLoading, mutate } = useSWR<Evaluation[]>(url, fetcher, SHORT);
+  const { data, error, isLoading, mutate } = useSWR<Evaluation[]>(
+    url,
+    async (u: string) => normalizeEvaluationList(await fetcher<unknown>(u)),
+    SHORT
+  );
   return { evaluations: data ?? [], isLoading, error, mutate };
 }
 
@@ -370,13 +421,21 @@ export function useBudgetSynthese(annee?: number) {
 }
 
 export function useBudgetCategories() {
-  const { data, error, isLoading, mutate } = useSWR<BudgetCategorie[]>("/budget/categories", fetcher, SHORT);
+  const { data, error, isLoading, mutate } = useSWR<BudgetCategorie[]>(
+    "/budget/categories",
+    async (u: string) => normalizeBudgetCategorieList(await fetcher<unknown>(u)),
+    SHORT
+  );
   return { categories: data ?? [], isLoading, error, mutate };
 }
 
 export function useBudgetEnveloppes(filters?: { annee?: number; statut?: string }) {
   const url = `/budget/enveloppes${qs(filters ?? {})}`;
-  const { data, error, isLoading, mutate } = useSWR<BudgetEnveloppe[]>(url, fetcher, SHORT);
+  const { data, error, isLoading, mutate } = useSWR<BudgetEnveloppe[]>(
+    url,
+    async (u: string) => normalizeBudgetEnveloppeList(await fetcher<unknown>(u)),
+    SHORT
+  );
   return { enveloppes: data ?? [], isLoading, error, mutate };
 }
 
@@ -388,7 +447,11 @@ export function useBudgetDepenses(filters?: {
   date_to?: string;
 }) {
   const url = `/budget/depenses${qs(filters ?? {})}`;
-  const { data, error, isLoading, mutate } = useSWR<BudgetDepense[]>(url, fetcher, SHORT);
+  const { data, error, isLoading, mutate } = useSWR<BudgetDepense[]>(
+    url,
+    async (u: string) => normalizeBudgetDepenseList(await fetcher<unknown>(u)),
+    SHORT
+  );
   return { depenses: data ?? [], isLoading, error, mutate };
 }
 
@@ -419,14 +482,14 @@ async function fetchDashboardRecrutementsList() {
   if (fromDashboard.length > 0) return fromDashboard;
 
   try {
-    const offres = await apiClient.get<Array<Record<string, unknown>>>("/offres?statut=ouverte");
+    const offres = normalizeOffreList(await apiClient.get<unknown>("/offres?statut=ouverte"));
     return offres.map((o) => ({
-      id: Number(o.id) || 0,
-      titre: String(o.titre ?? "Offre"),
-      departement: String(o.departement ?? "—"),
-      cible_candidats: Number(o.cible_candidats ?? o.cibleCandidats) || 1,
-      statut: String(o.statut ?? "ouverte"),
-      candidats_count: Number(o.candidats_count ?? o.candidatsCount) || 0,
+      id: o.id,
+      titre: o.titre || "Offre",
+      departement: o.departement ?? "—",
+      cible_candidats: o.cible_candidats || 1,
+      statut: o.statut,
+      candidats_count: o.candidats_count ?? 0,
     }));
   } catch {
     return [];

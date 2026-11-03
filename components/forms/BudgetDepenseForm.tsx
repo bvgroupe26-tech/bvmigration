@@ -12,6 +12,7 @@ import {
   isDefaultBudgetEnveloppe,
   resolveEnveloppeIdForDepense,
 } from "@/lib/budget-depense-utils";
+import { localDateISO } from "@/lib/date-local";
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import type { BudgetDepense, BudgetEnveloppe, BudgetCategorie } from "@/lib/types";
@@ -58,7 +59,7 @@ export default function BudgetDepenseForm({
       enveloppe_id: initialEnveloppeId(depense, defaultEnveloppeId),
       libelle: depense?.libelle ?? "",
       montant: depense?.montant ?? 0,
-      date_depense: depense?.date_depense ?? new Date().toISOString().slice(0, 10),
+      date_depense: depense?.date_depense || localDateISO(),
       fournisseur: depense?.fournisseur ?? "",
       reference_piece: depense?.reference_piece ?? "",
       statut: depense?.statut ?? "en_attente",
@@ -86,12 +87,19 @@ export default function BudgetDepenseForm({
     <form
       onSubmit={handleSubmit(async (data) => {
         try {
-          const annee = new Date(data.date_depense).getFullYear();
+          const annee = Number(data.date_depense.slice(0, 4)) || new Date().getFullYear();
           const enveloppeId = await resolveEnveloppeIdForDepense(data.enveloppe_id, annee);
           const payload = depenseToApiPayload(data as Record<string, unknown>, enveloppeId);
 
-          if (isEdit) await apiClient.put(`/budget/depenses/${depense.id}`, payload);
-          else await apiClient.post("/budget/depenses", payload);
+          if (isEdit) {
+            // En édition, une catégorie vidée doit être détachée explicitement côté API.
+            await apiClient.put(`/budget/depenses/${depense.id}`, {
+              categorieId: null,
+              ...payload,
+            });
+          } else {
+            await apiClient.post("/budget/depenses", payload);
+          }
 
           toast.success(isEdit ? "Dépense mise à jour" : "Dépense enregistrée");
           onSuccess?.();
@@ -149,7 +157,7 @@ export default function BudgetDepenseForm({
         hint="Laissez « Budget global » si vous ne ventilez pas par enveloppe"
         error={errors.enveloppe_id?.message}
       >
-        <NativeSelect {...register("enveloppe_id")} defaultValue="">
+        <NativeSelect {...register("enveloppe_id")}>
           <option value="">{DEFAULT_BUDGET_ENVELOPPE_LABEL} — sans enveloppe dédiée</option>
           {dedicatedEnveloppes.map((e) => (
             <option key={e.id} value={e.id}>

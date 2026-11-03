@@ -22,6 +22,7 @@ import {
   getMonthBounds,
 } from "@/lib/presence-utils";
 import type { Presence } from "@/lib/types";
+import { localDateISO } from "@/lib/date-local";
 
 const MOIS = [
   "Janvier",
@@ -42,7 +43,7 @@ type ViewMode = "day" | "month";
 
 export default function PresencePage() {
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+  const today = localDateISO(now);
   const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [date, setDate] = useState(today);
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -53,29 +54,38 @@ export default function PresencePage() {
 
   const monthBounds = useMemo(() => getMonthBounds(year, month), [year, month]);
   const { employes } = useEmployes({ statut: "actif", limit: 500 });
-  const activeCount = employes.length;
 
+  // Le filtre de statut est appliqué côté client : les statistiques portent toujours sur tous les pointages.
   const presenceFilters =
     viewMode === "day"
-      ? {
-          date,
-          statut: statutFilter === "all" ? undefined : statutFilter,
-          limit: 1000,
-        }
-      : {
-          date_from: monthBounds.date_from,
-          date_to: monthBounds.date_to,
-          statut: statutFilter === "all" ? undefined : statutFilter,
-          limit: 5000,
-        };
+      ? { date, limit: 1000 }
+      : { date_from: monthBounds.date_from, date_to: monthBounds.date_to, limit: 5000 };
 
-  const { presences, isLoading, mutate } = usePresences(presenceFilters);
+  const { presences: allPresences, isLoading, mutate } = usePresences(presenceFilters);
+  const presences = useMemo(
+    () =>
+      statutFilter === "all"
+        ? allPresences
+        : allPresences.filter((p) => p.statut === statutFilter),
+    [allPresences, statutFilter]
+  );
+
+  // Effectif attendu à la date consultée : employés déjà embauchés et encore sous contrat, hors week-end.
+  const activeCount = useMemo(() => {
+    const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+    if (weekday === 0 || weekday === 6) return 0;
+    return employes.filter((e) => {
+      const embauche = e.date_embauche?.slice(0, 10);
+      const fin = e.date_fin_contrat?.slice(0, 10);
+      return (!embauche || embauche <= date) && (!fin || fin >= date);
+    }).length;
+  }, [employes, date]);
 
   const dayRate = useMemo(
-    () => computeDailyPresenceRate(presences, activeCount),
-    [presences, activeCount]
+    () => computeDailyPresenceRate(allPresences, activeCount),
+    [allPresences, activeCount]
   );
-  const monthStats = useMemo(() => computePresenceStats(presences), [presences]);
+  const monthStats = useMemo(() => computePresenceStats(allPresences), [allPresences]);
   const monthTaux =
     monthStats.total > 0
       ? Math.round(((monthStats.present + monthStats.retard) / monthStats.total) * 100)
@@ -90,7 +100,7 @@ export default function PresencePage() {
           absent: dayRate.absent,
           conge: dayRate.conge,
           mission: dayRate.mission,
-          total: presences.length,
+          total: allPresences.length,
           tauxPct: dayRate.tauxPct,
         }
       : {
@@ -106,7 +116,7 @@ export default function PresencePage() {
 
   const subtitle =
     viewMode === "day"
-      ? new Date(date).toLocaleDateString("fr-FR", {
+      ? new Date(`${date}T12:00:00`).toLocaleDateString("fr-FR", {
           weekday: "long",
           day: "numeric",
           month: "long",

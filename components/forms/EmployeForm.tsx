@@ -21,6 +21,7 @@ import type { Employe } from "@/lib/types";
 import { normalizeEmploye } from "@/lib/employe-utils";
 import { prepareEmployeApiPayload } from "@/lib/employe-payload";
 import { usePostes } from "@/hooks/usePostes";
+import { localDateISO } from "@/lib/date-local";
 
 const DEPARTEMENT_SUGGESTIONS = [
   "Tech",
@@ -102,7 +103,7 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
       type_contrat: (employe.type_contrat ?? "CDI") as EmployeInput["type_contrat"],
       salaire_base: employe.salaire_base,
       date_embauche:
-        employe.date_embauche ?? new Date().toISOString().slice(0, 10),
+        employe.date_embauche ?? localDateISO(),
       date_fin_contrat:
         employe.date_fin_contrat ??
         (employe as { dateFinContrat?: string | null }).dateFinContrat ??

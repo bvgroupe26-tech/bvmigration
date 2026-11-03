@@ -5,13 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import type { UserMePayload } from "@/lib/employee/types";
 import { resolveApiBaseUrl } from "@/lib/resolve-api-url";
 import {
-  AUTH_REFRESH_URL,
-  extractAccessToken,
   getAccessToken,
+  isRefreshAuthRejected,
   loginRequest,
   logout as authLogout,
-  persistAccessToken,
   readPersistedAccessTokenRaw,
+  refreshAccessToken,
   resetAuthSessionState,
   setAccessToken,
   type LoginCredentials,
@@ -29,7 +28,7 @@ import {
 } from "@/lib/session-storage";
 import { BV_AUTH_READY_EVENT } from "@/lib/pwa-install";
 
-const PUBLIC_PATHS = new Set(["/", "/login"]);
+const PUBLIC_PATHS = new Set(["/", "/login", "/offline"]);
 const AUTH_FETCH_TIMEOUT_MS = 20_000;
 
 type AuthContextValue = {
@@ -179,44 +178,19 @@ async function fetchCurrentUser(accessToken: string): Promise<UserMePayload> {
   return profile;
 }
 
-type AuthTokenPayload = {
-  access_token?: string;
-  accessToken?: string;
-  token?: string;
-};
-
+/** Passe par le chemin de refresh unique (dédupliqué + verrou inter-onglets) de authClient. */
 async function refreshBootstrapToken(): Promise<string> {
-  let res: Response;
   try {
-    res = await authFetchWithTimeout(AUTH_REFRESH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
+    return await refreshAccessToken();
   } catch (error) {
-    if (error instanceof AuthBootstrapError) throw error;
-    throw new AuthBootstrapError("Erreur réseau", null);
+    if (isRefreshAuthRejected(error)) {
+      throw new AuthBootstrapError("Session expirée", 401);
+    }
+    throw new AuthBootstrapError(
+      error instanceof Error ? error.message : "Impossible de renouveler la session",
+      null
+    );
   }
-
-  const json = await res.json().catch(() => null);
-
-  if (res.status === 401 || res.status === 403) {
-    throw new AuthBootstrapError("Session expirée", res.status);
-  }
-  if (!res.ok) {
-    throw new AuthBootstrapError("Impossible de renouveler la session", res.status);
-  }
-
-  const payload =
-    json && typeof json === "object" && "data" in json
-      ? (json as { data: AuthTokenPayload }).data
-      : (json as AuthTokenPayload);
-  const token = extractAccessToken(payload);
-  if (!token) {
-    throw new AuthBootstrapError("Jeton d'accès introuvable", res.status);
-  }
-
-  await persistAccessToken(token);
-  return token;
 }
 
 function ReconnectingBanner() {
@@ -231,9 +205,9 @@ function ReconnectingBanner() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const cachedOnInit = readCachedProfile();
-  const [user, setUser] = useState<UserMePayload | null>(cachedOnInit);
-  const [isAuthenticated, setIsAuthenticated] = useState(Boolean(cachedOnInit));
+  // Profil en cache lu après hydratation (localStorage absent côté serveur → mismatch sinon).
+  const [user, setUser] = useState<UserMePayload | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [suppressLoginRedirect, setSuppressLoginRedirect] = useState(false);
@@ -311,6 +285,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+
+    const cached = readCachedProfile();
+    if (cached) {
+      setUser((current) => current ?? cached);
+      setIsAuthenticated(true);
+    }
 
     const run = async () => {
       try {

@@ -16,7 +16,8 @@ export async function POST(req: Request) {
     c.delete(TOKEN_COOKIE_NAME);
     const maxAge = getTokenMaxAgeSeconds(token, TOKEN_MAX_AGE);
     c.set(TOKEN_COOKIE_NAME, token, {
-      httpOnly: false,
+      // Lu uniquement côté serveur (proxy.ts) ; le client garde le jeton en mémoire.
+      httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",

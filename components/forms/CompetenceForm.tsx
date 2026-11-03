@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { competenceSchema, type CompetenceInput } from "@/lib/schemas";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
+import { stripEmpty } from "@/lib/rh-normalizers";
 import { Field, Input, NativeSelect } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import { useEmployes } from "@/hooks/api";
@@ -26,7 +27,7 @@ export default function CompetenceForm({ onSuccess, onCancel }: Props) {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      await apiClient.post("/competences", data);
+      await apiClient.post("/competences", stripEmpty(data));
       toast.success("Compétence ajoutée");
       onSuccess?.();
     } catch (err) {

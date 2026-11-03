@@ -1,12 +1,7 @@
 "use client";
 
 import type { UserMePayload } from "@/lib/employee/types";
-import {
-  decodeJwtPayload,
-  isAccessTokenUsable,
-  isJwtExpired,
-  shouldRefreshAccessToken,
-} from "@/lib/session";
+import { isAccessTokenUsable, shouldRefreshAccessToken } from "@/lib/session";
 
 /** BFF Next (même origine) — relaie les cookies HttpOnly vers NestJS */
 export const AUTH_REFRESH_URL = "/api/auth/refresh";
@@ -16,27 +11,62 @@ const SET_TOKEN_URL = "/api/set-token";
 
 export const ACCESS_TOKEN_COOKIE = "bv-token";
 
+const REFRESH_LOCK_NAME = "bv-refresh";
+const AUTH_CHANNEL_NAME = "bv-auth";
+
 let accessToken: string | null = null;
-let isRefreshing = false;
-
-type RefreshWaiter = {
-  resolve: (token: string) => void;
-  reject: (error: unknown) => void;
-};
-
-let refreshWaiters: RefreshWaiter[] = [];
+let refreshInFlight: Promise<string> | null = null;
 
 const AUTH_FETCH_TIMEOUT_MS = 20_000;
 /** Render free tier : cold start pouvant dépasser 20s sur POST /api/auth/refresh */
 const AUTH_REFRESH_FETCH_TIMEOUT_MS = 35_000;
 const REFRESH_RETRY_DELAYS_MS = [1_000, 2_000] as const;
 
+/** Le serveur a refusé la session (401/403) : seule cause légitime de déconnexion. */
+export class RefreshAuthError extends Error {
+  constructor(message = "Session expirée. Veuillez vous reconnecter.") {
+    super(message);
+    this.name = "RefreshAuthError";
+  }
+}
+
+/** Réseau coupé, timeout, cold start ou 5xx : la session est peut-être toujours valide. */
+export class RefreshTransientError extends Error {
+  constructor(message = "Délai dépassé. Vérifiez votre connexion et réessayez.") {
+    super(message);
+    this.name = "RefreshTransientError";
+  }
+}
+
+type AuthChannelMessage = { type: "token"; token: string } | { type: "logout" };
+
+const authChannel: BroadcastChannel | null =
+  typeof window !== "undefined" && typeof BroadcastChannel !== "undefined"
+    ? new BroadcastChannel(AUTH_CHANNEL_NAME)
+    : null;
+
+authChannel?.addEventListener("message", (event: MessageEvent<AuthChannelMessage>) => {
+  const message = event.data;
+  if (message?.type === "token" && isAccessTokenUsable(message.token)) {
+    accessToken = message.token;
+  } else if (message?.type === "logout") {
+    accessToken = null;
+  }
+});
+
+function broadcast(message: AuthChannelMessage): void {
+  try {
+    authChannel?.postMessage(message);
+  } catch {
+    /* canal fermé */
+  }
+}
+
 export function setAccessToken(token: string | null): void {
   accessToken = token;
 }
 
-/** Lit le jeton stocké dans le cookie `bv-token` (survit au rechargement / mobile). */
-/** Lit le cookie bv-token même si le JWT est expiré (pour déclencher un refresh). */
+/** Ancien cookie lisible JS (avant passage en httpOnly) ; renvoie null une fois le cookie httpOnly. */
 export function readPersistedAccessTokenRaw(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(?:^|; )${ACCESS_TOKEN_COOKIE}=([^;]*)`));
@@ -67,17 +97,13 @@ export function getAccessToken(): string | null {
 }
 
 export function getIsRefreshing(): boolean {
-  return isRefreshing;
+  return refreshInFlight !== null;
 }
 
 /** Réinitialise l’état client après déconnexion (évite les blocages sur mobile). */
 export function resetAuthSessionState(): void {
   accessToken = null;
-  if (isRefreshing) {
-    notifyRefreshFailure(new Error("Session fermée"));
-  }
-  isRefreshing = false;
-  refreshWaiters = [];
+  refreshInFlight = null;
   if (typeof document !== "undefined") {
     document.cookie = `${ACCESS_TOKEN_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
   }
@@ -87,19 +113,8 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isRefreshNetworkError(error: unknown): boolean {
-  if (error instanceof Error) {
-    if (error.name === "AbortError") return true;
-    if (error.message === "Failed to fetch" || error.message.includes("NetworkError")) return true;
-  }
-  return error instanceof TypeError;
-}
-
-function isRefreshAuthRejected(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    error.message === "Session expirée. Veuillez vous reconnecter."
-  );
+export function isRefreshAuthRejected(error: unknown): boolean {
+  return error instanceof RefreshAuthError;
 }
 
 async function authFetch(
@@ -141,16 +156,6 @@ export function extractAccessToken(payload: AuthTokenPayload | string | null | u
   return payload.access_token || payload.accessToken || payload.token || "";
 }
 
-function notifyRefreshSuccess(token: string): void {
-  refreshWaiters.forEach(({ resolve }) => resolve(token));
-  refreshWaiters = [];
-}
-
-function notifyRefreshFailure(error: unknown): void {
-  refreshWaiters.forEach(({ reject }) => reject(error));
-  refreshWaiters = [];
-}
-
 /** Enregistre le jeton côté navigateur (cookie `bv-token` via BFF). */
 export async function persistAccessToken(token: string): Promise<void> {
   setAccessToken(token);
@@ -175,20 +180,30 @@ export async function clearPersistedAccessToken(): Promise<void> {
 }
 
 /**
- * POST /api/auth/refresh — cookie HttpOnly refresh uniquement (pas de body).
+ * Sérialise le refresh entre onglets / PWA + navigateur : le backend fait tourner le refresh token
+ * et considère la réutilisation d'un token déjà remplacé comme un vol.
  */
-export async function refreshAccessToken(): Promise<string> {
-  if (isRefreshing) {
-    return new Promise<string>((resolve, reject) => {
-      refreshWaiters.push({ resolve, reject });
-    });
+async function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  if (typeof navigator !== "undefined" && "locks" in navigator && navigator.locks?.request) {
+    return navigator.locks.request(REFRESH_LOCK_NAME, fn);
+  }
+  return fn();
+}
+
+async function performRefresh(tokenAtStart: string | null): Promise<string> {
+  // Un autre onglet a renouvelé pendant qu'on attendait le verrou : on réutilise son jeton.
+  if (
+    accessToken &&
+    accessToken !== tokenAtStart &&
+    isAccessTokenUsable(accessToken) &&
+    !shouldRefreshAccessToken(accessToken)
+  ) {
+    return accessToken;
   }
 
-  isRefreshing = true;
-  const previousToken = accessToken ?? readPersistedAccessTokenRaw();
-
+  let res: Response;
   try {
-    const res = await authFetch(
+    res = await authFetch(
       AUTH_REFRESH_URL,
       {
         method: "POST",
@@ -196,45 +211,47 @@ export async function refreshAccessToken(): Promise<string> {
       },
       AUTH_REFRESH_FETCH_TIMEOUT_MS
     );
-
-    const json = await res.json().catch(() => null);
-
-    if (res.status === 401) {
-      setAccessToken(null);
-      throw new Error("Session expirée. Veuillez vous reconnecter.");
-    }
-
-    if (!res.ok) {
-      const message =
-        (json && typeof json === "object" && "error" in json && String((json as { error: unknown }).error)) ||
-        "Impossible de renouveler la session.";
-      throw new Error(message);
-    }
-
-    const payload = unwrapPayload<AuthTokenPayload>(json);
-    const token = extractAccessToken(payload);
-    if (!token) {
-      throw new Error("Jeton d'accès introuvable.");
-    }
-
-    await persistAccessToken(token);
-    notifyRefreshSuccess(token);
-    return token;
-  } catch (error) {
-    if (isRefreshNetworkError(error)) {
-      if (previousToken) setAccessToken(previousToken);
-      const networkErr = new Error("Délai dépassé. Vérifiez votre connexion et réessayez.");
-      notifyRefreshFailure(networkErr);
-      throw networkErr;
-    }
-    if (!isRefreshAuthRejected(error) && previousToken) {
-      setAccessToken(previousToken);
-    }
-    notifyRefreshFailure(error);
-    throw error;
-  } finally {
-    isRefreshing = false;
+  } catch {
+    throw new RefreshTransientError();
   }
+
+  const json = await res.json().catch(() => null);
+
+  if (res.status === 401 || res.status === 403) {
+    setAccessToken(null);
+    throw new RefreshAuthError();
+  }
+
+  if (!res.ok) {
+    const message =
+      (json && typeof json === "object" && "error" in json && String((json as { error: unknown }).error)) ||
+      "Impossible de renouveler la session.";
+    throw new RefreshTransientError(message);
+  }
+
+  const token = extractAccessToken(unwrapPayload<AuthTokenPayload>(json));
+  if (!token) {
+    throw new RefreshTransientError("Jeton d'accès introuvable.");
+  }
+
+  await persistAccessToken(token);
+  broadcast({ type: "token", token });
+  return token;
+}
+
+/**
+ * POST /api/auth/refresh — cookie HttpOnly refresh uniquement (pas de body).
+ * Rejette avec RefreshAuthError (session refusée) ou RefreshTransientError (réseau / serveur).
+ */
+export function refreshAccessToken(): Promise<string> {
+  if (refreshInFlight) return refreshInFlight;
+
+  const tokenAtStart = accessToken;
+  const pending = withRefreshLock(() => performRefresh(tokenAtStart)).finally(() => {
+    if (refreshInFlight === pending) refreshInFlight = null;
+  });
+  refreshInFlight = pending;
+  return pending;
 }
 
 /**
@@ -287,8 +304,30 @@ export async function trySilentRefresh(): Promise<string | null> {
   }
 }
 
+async function clearClientCaches(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    if ("caches" in window) {
+      // Le precache (page /offline, assets du build) est conservé : il ne contient aucune donnée utilisateur.
+      const names = await caches.keys();
+      await Promise.all(
+        names.filter((name) => !name.includes("precache")).map((name) => caches.delete(name))
+      );
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const { clearAllOfflineData } = await import("@/lib/db/offlineDB");
+    await clearAllOfflineData();
+  } catch {
+    /* IndexedDB indisponible (mode privé) */
+  }
+}
+
 export async function logout(): Promise<void> {
   await clearPersistedAccessToken();
+  broadcast({ type: "logout" });
   try {
     await authFetch(AUTH_LOGOUT_URL, {
       method: "POST",
@@ -298,6 +337,7 @@ export async function logout(): Promise<void> {
     /* ignore network errors during logout */
   } finally {
     resetAuthSessionState();
+    await clearClientCaches();
     if (typeof window !== "undefined") {
       window.location.replace("/login");
     }

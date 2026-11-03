@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { offreSchema, type OffreInput } from "@/lib/schemas";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
+import { stripEmpty } from "@/lib/rh-normalizers";
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 
@@ -41,7 +42,7 @@ export default function OffreForm({ onSuccess, onCancel }: Props) {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      await apiClient.post("/offres", data);
+      await apiClient.post("/offres", stripEmpty(data));
       toast.success("Offre publiée");
       onSuccess?.();
     } catch (err) {

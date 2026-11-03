@@ -4,7 +4,9 @@
 
 const DEFAULT_ICON = "/icons/icon-192.png";
 const VAPID_KEY_URL = "/api/nest/push/vapid-public-key";
-const SUBSCRIBE_URL = "/api/nest/push/subscribe";
+const RESUBSCRIBE_URL = "/api/nest/push/resubscribe";
+// Doit correspondre à `bv-rh-${SW_CACHE_VERSION}` dans next.config.ts.
+const CURRENT_CACHE_ID = "bv-rh-v11";
 const PUSH_RESYNC_MESSAGE = "BV_PUSH_RESYNC";
 const PUSH_NOTIFICATION_CLICK_MESSAGE = "BV_NOTIFICATION_CLICK";
 
@@ -161,33 +163,58 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(openNotificationTarget(rawUrl));
 });
 
-// Renouvellement automatique de subscription
+// Renouvellement automatique de subscription : le SW n'a pas de JWT, l'endpoint public
+// /push/resubscribe remplace l'ancien abonnement (preuve = ancien endpoint connu en base).
 self.addEventListener("pushsubscriptionchange", (event) => {
   event.waitUntil(
     (async () => {
-      const oldSubscription = event.oldSubscription;
-      if (oldSubscription) {
+      const oldEndpoint = event.oldSubscription?.endpoint;
+
+      let subscription = event.newSubscription;
+      if (!subscription) {
+        const publicKey = await fetchVapidPublicKey();
+        if (!publicKey) return;
+        subscription = await self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+
+      if (oldEndpoint) {
         try {
-          await fetch(SUBSCRIBE_URL.replace("/subscribe", "/unsubscribe"), {
-            method: "DELETE",
+          await fetch(RESUBSCRIBE_URL, {
+            method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ endpoint: oldSubscription.endpoint }),
+            body: JSON.stringify({
+              oldEndpoint,
+              subscription: subscriptionToJson(subscription),
+            }),
           });
         } catch {
-          /* ignore */
+          /* le client ouvert refera la synchro via BV_PUSH_RESYNC */
         }
       }
 
-      const publicKey = await fetchVapidPublicKey();
-      if (!publicKey) return;
-
-      const subscription = await self.registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
-      });
-
       await notifyClientsPushResync();
+    })()
+  );
+});
+
+// Purge des caches laissés par les anciennes versions du SW (pages HTML pré-cachées, cache API).
+const LEGACY_CACHE_NAMES = ["api-nest-cache"];
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      const names = await caches.keys();
+      await Promise.all(
+        names
+          .filter(
+            (name) =>
+              LEGACY_CACHE_NAMES.includes(name) ||
+              (name.includes("precache") && !name.includes(CURRENT_CACHE_ID))
+          )
+          .map((name) => caches.delete(name))
+      );
     })()
   );
 });

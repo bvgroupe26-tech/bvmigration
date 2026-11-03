@@ -204,6 +204,14 @@ export async function clearStore(storeName: string): Promise<void> {
   }
 }
 
+/** Au logout : les données hors-ligne (et la file de synchro) ne doivent pas fuiter vers le compte suivant. */
+export async function clearAllOfflineData(): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(STORE_NAMES, "readwrite");
+  await Promise.all(STORE_NAMES.map((name) => tx.objectStore(name).clear()));
+  await tx.done;
+}
+
 export async function addToSyncQueue(
   item: Omit<SyncQueueItem, "id" | "retries" | "status">
 ): Promise<void> {

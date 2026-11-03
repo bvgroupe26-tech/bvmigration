@@ -15,6 +15,7 @@ import {
   PRESENCE_STATUT_LABELS,
 } from "@/lib/presence-utils";
 import type { Presence } from "@/lib/types";
+import { localDateISO } from "@/lib/date-local";
 
 const MOIS = [
   "Janvier",
@@ -45,7 +46,7 @@ export default function AdminEmployeePresencesClient({
   backLabel = "Retour aux employés",
 }: AdminEmployeePresencesClientProps) {
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+  const today = localDateISO(now);
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [date, setDate] = useState(today);
   const [year, setYear] = useState(now.getFullYear());

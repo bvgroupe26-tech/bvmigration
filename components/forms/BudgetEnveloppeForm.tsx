@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { budgetEnveloppeSchema, type BudgetEnveloppeInput } from "@/lib/schemas";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
+import { stripEmpty } from "@/lib/rh-normalizers";
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/Field";
 import Button from "@/components/ui/Button";
 import type { BudgetEnveloppe } from "@/lib/types";
@@ -41,7 +42,7 @@ export default function BudgetEnveloppeForm({ enveloppe, defaultAnnee, onSuccess
       onSubmit={handleSubmit(async (data) => {
         try {
           if (isEdit) await apiClient.put(`/budget/enveloppes/${enveloppe.id}`, data);
-          else await apiClient.post("/budget/enveloppes", data);
+          else await apiClient.post("/budget/enveloppes", stripEmpty(data));
           toast.success(isEdit ? "Enveloppe mise à jour" : "Enveloppe créée");
           onSuccess?.();
         } catch (e) {

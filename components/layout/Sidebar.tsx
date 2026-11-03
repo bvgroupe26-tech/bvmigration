@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { LogOut } from "lucide-react";
 import { ADMIN_NAV, isNavActive } from "@/lib/nav-config";
+import { filterNavForRole } from "@/lib/roles";
 import { cn, getInitials, getAvatarGradient } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
@@ -18,8 +19,6 @@ type NavItem = {
   icon: (typeof ADMIN_NAV)[number]["icon"];
   isSubItem?: boolean;
 };
-
-const navItems: NavItem[] = ADMIN_NAV;
 
 type SidebarProps = {
   user?: {
@@ -38,6 +37,7 @@ export default function Sidebar({ user, desktop = false, className }: SidebarPro
   const router = useRouter();
   const { logout } = useAuth();
   const { photoUrl } = useProfilePhoto();
+  const navItems: NavItem[] = filterNavForRole(ADMIN_NAV, user?.role);
 
   async function handleLogout() {
     try {

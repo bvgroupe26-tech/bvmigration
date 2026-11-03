@@ -16,27 +16,13 @@ type CreatedStaffUser = {
   nom?: string;
   prenom?: string;
   role?: string;
+  employe_id?: number | null;
 };
 
 /**
- * Crée un compte administration via l'API Nest.
- * - rh / manager → POST /auth/register
- * - admin → POST /auth/register-admin puis repli POST /users
+ * Crée un compte administration via POST /users (admin : tous rôles ; RH : rh et manager).
+ * N'ouvre aucune session pour le compte créé : l'utilisateur courant reste connecté.
  */
-export async function createStaffAccount(data: StaffPayload): Promise<CreatedStaffUser> {
-  const payload = data;
-
-  if (payload.role === "admin") {
-    try {
-      return await apiClient.post<CreatedStaffUser>("/auth/register-admin", payload);
-    } catch (adminErr) {
-      try {
-        return await apiClient.post<CreatedStaffUser>("/users", payload);
-      } catch {
-        throw adminErr;
-      }
-    }
-  }
-
-  return apiClient.post<CreatedStaffUser>("/auth/register", payload);
+export function createStaffAccount(data: StaffPayload): Promise<CreatedStaffUser> {
+  return apiClient.post<CreatedStaffUser>("/users", data);
 }

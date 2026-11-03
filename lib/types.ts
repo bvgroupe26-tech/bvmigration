@@ -74,6 +74,8 @@ export type Absence = {
   employe_nom?: string;
   employe_prenom?: string;
   employe_poste?: string | null;
+  /** Durée en jours ouvrés calculée par le serveur. */
+  duree_jours?: number;
 };
 
 export type PaieStatut = "en_attente" | "paye" | "annule";
