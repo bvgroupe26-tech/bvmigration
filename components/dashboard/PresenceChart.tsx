@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -48,10 +47,6 @@ function CustomTooltip({
 
 export default function PresenceChart() {
   const { chart, isLoading } = useDashboardPresences();
-  const [isClient, setIsClient] = useState(false);
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
   const totalPresents = chart.reduce((acc, c) => acc + c.presents, 0);
   const isEmpty = chart.length === 0 || totalPresents === 0;
   const chartSubtitle = isDailyPresencesChart(chart) ? "30 derniers jours" : "6 derniers mois";

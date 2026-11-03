@@ -3,7 +3,6 @@
 import { motion } from "framer-motion";
 import {
   UserPlus,
-  TrendingUp,
   CalendarOff,
   FileText,
   GraduationCap,
