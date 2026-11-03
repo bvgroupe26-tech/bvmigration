@@ -29,15 +29,40 @@ export function isEmployeePath(pathname: string): boolean {
   return pathname === "/employee" || pathname.startsWith("/employee/");
 }
 
-/** Accès à l'espace employé (/employee) : employés + staff (RH, manager, admin). */
+/** Accès à l'espace employé (/employee) : employés, et staff (RH, manager, admin) ayant une fiche liée. */
 export function hasEmployeePanelAccess(
   role?: string | null,
-  _employeId?: number | null
+  employeId?: number | null
 ): boolean {
   const normalized = normalizeAppRole(role);
   if (!normalized) return false;
   if (normalized === "employee") return true;
-  return hasAdminPanelAccess(normalized);
+  return hasAdminPanelAccess(normalized) && employeId != null && employeId > 0;
+}
+
+/** Staff qui est aussi salarié : peut basculer entre l'espace RH et son espace employé. */
+export function hasDualRole(role?: string | null, employeId?: number | null): boolean {
+  return hasAdminPanelAccess(role) && hasEmployeePanelAccess(role, employeId);
+}
+
+export type Workspace = "rh" | "employee";
+const LAST_WORKSPACE_KEY = "bv-last-workspace";
+
+export function rememberWorkspace(space: Workspace): void {
+  try {
+    localStorage.setItem(LAST_WORKSPACE_KEY, space);
+  } catch {
+    /* mode privé / stockage bloqué */
+  }
+}
+
+export function readLastWorkspace(): Workspace | null {
+  try {
+    const v = localStorage.getItem(LAST_WORKSPACE_KEY);
+    return v === "rh" || v === "employee" ? v : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Rôles autorisés sur les layouts /employee (AuthGuard). */

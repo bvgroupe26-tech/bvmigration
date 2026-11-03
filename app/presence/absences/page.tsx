@@ -24,6 +24,7 @@ import Modal from "@/components/ui/Modal";
 import Skeleton from "@/components/ui/Skeleton";
 import AbsenceForm from "@/components/forms/AbsenceForm";
 import { useAbsences } from "@/hooks/api";
+import { useAuth } from "@/context/AuthContext";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import { refreshNotificationsCache } from "@/hooks/useNotifications";
 import { absenceDureeJours, formatPeriodeAbsence } from "@/lib/absence-utils";
@@ -38,6 +39,8 @@ const TYPE_LABELS: Record<string, string> = {
   autre: "Autre",
 };
 
+const SELF_VALIDATION_HINT = "Vous ne pouvez pas valider votre propre demande";
+
 const STATUT_LABELS: Record<string, string> = {
   en_attente: "En attente",
   approuve: "Approuvée",
@@ -49,6 +52,8 @@ export default function AbsencesPage() {
   const [typeFilter, setTypeFilter] = useState<AbsenceType | "all">("all");
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const { user } = useAuth();
+  const myEmployeId = user?.employeId ?? null;
 
   const { absences, isLoading, mutate } = useAbsences({
     statut: statutFilter === "all" ? undefined : statutFilter,
@@ -155,27 +160,35 @@ export default function AbsencesPage() {
       key: "actions",
       header: "",
       align: "right",
-      render: (a) =>
-        a.statut === "en_attente" ? (
-          <div className="flex justify-end gap-1.5">
+      render: (a) => {
+        if (a.statut !== "en_attente") {
+          return <span className="text-[11px] text-text-tertiary">—</span>;
+        }
+        const own = myEmployeId != null && a.employe_id === myEmployeId;
+        const ownTitle = own ? SELF_VALIDATION_HINT : undefined;
+        return (
+          <div className="flex justify-end gap-1.5" title={ownTitle}>
             <button
               type="button"
               onClick={() => patch(a, "approuve")}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 text-[11px] text-emerald-300 transition hover:bg-emerald-500/20"
+              disabled={own}
+              aria-label={own ? `Approuver — ${SELF_VALIDATION_HINT}` : undefined}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 text-[11px] text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-emerald-500/10"
             >
               <Check className="h-3 w-3" /> Approuver
             </button>
             <button
               type="button"
               onClick={() => patch(a, "refuse")}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-2 text-[11px] text-red-300 transition hover:bg-red-500/20"
+              disabled={own}
+              aria-label={own ? `Refuser — ${SELF_VALIDATION_HINT}` : undefined}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-2 text-[11px] text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-red-500/10"
             >
               <X className="h-3 w-3" /> Refuser
             </button>
           </div>
-        ) : (
-          <span className="text-[11px] text-text-tertiary">—</span>
-        ),
+        );
+      },
     },
   ];
 

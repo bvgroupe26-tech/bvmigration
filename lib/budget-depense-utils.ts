@@ -1,7 +1,27 @@
 import { apiClient } from "@/lib/fetcher";
-import type { BudgetEnveloppe } from "@/lib/types";
+import type { BudgetDepenseStatut, BudgetEnveloppe } from "@/lib/types";
 
 export const DEFAULT_BUDGET_ENVELOPPE_LABEL = "Budget général";
+
+export const DEPENSE_STATUT_LABELS: Record<BudgetDepenseStatut, string> = {
+  brouillon: "Brouillon",
+  soumise: "Soumise",
+  validee_n1: "Validée N1",
+  validee: "Validée",
+  refusee: "Refusée",
+  payee: "Payée",
+  annulee: "Annulée",
+};
+
+/** Variante visuelle de StatBadge (partagée avec les absences). */
+export function depenseStatutBadgeVariant(
+  s: BudgetDepenseStatut
+): "en_attente" | "approuve" | "refuse" | "paye" {
+  if (s === "payee") return "paye";
+  if (s === "validee") return "approuve";
+  if (s === "refusee" || s === "annulee") return "refuse";
+  return "en_attente";
+}
 
 function unwrapList<T>(raw: unknown): T[] {
   if (Array.isArray(raw)) return raw;

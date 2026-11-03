@@ -4,6 +4,8 @@ export type UserMePayload = {
   role: string;
   nom: string;
   prenom: string;
+  /** Le compte (staff compris) a une fiche employé : accès à « Mon espace employé ». */
+  hasEmployeProfile?: boolean;
   employeId?: number | null;
   matricule?: string | null;
   poste?: string | null;

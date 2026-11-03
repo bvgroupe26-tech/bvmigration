@@ -270,7 +270,14 @@ export type BudgetEnveloppe = {
   ecart?: number;
 };
 
-export type BudgetDepenseStatut = "en_attente" | "approuve" | "refuse" | "paye";
+export type BudgetDepenseStatut =
+  | "brouillon"
+  | "soumise"
+  | "validee_n1"
+  | "validee"
+  | "refusee"
+  | "payee"
+  | "annulee";
 
 export type BudgetDepense = {
   id: number;

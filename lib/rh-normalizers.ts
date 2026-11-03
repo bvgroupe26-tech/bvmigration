@@ -50,6 +50,28 @@ function strOrNull(v: unknown): string | null {
   return v == null || v === "" ? null : String(v);
 }
 
+const LEGACY_DEPENSE_STATUT: Record<string, BudgetDepenseStatut> = {
+  en_attente: "soumise",
+  approuve: "validee",
+  refuse: "refusee",
+  paye: "payee",
+};
+
+const DEPENSE_STATUTS: BudgetDepenseStatut[] = [
+  "brouillon",
+  "soumise",
+  "validee_n1",
+  "validee",
+  "refusee",
+  "payee",
+  "annulee",
+];
+
+function normalizeDepenseStatut(s: string): BudgetDepenseStatut {
+  if ((DEPENSE_STATUTS as string[]).includes(s)) return s as BudgetDepenseStatut;
+  return LEGACY_DEPENSE_STATUT[s] ?? "soumise";
+}
+
 /** Date ISO / Date / "YYYY-MM-DD HH:mm" → "YYYY-MM-DD" (jour civil tel que stocké). */
 function dateOnly(v: unknown): string | null {
   if (v == null || v === "") return null;
@@ -249,11 +271,11 @@ export function normalizeBudgetDepense(raw: unknown): BudgetDepense {
     enveloppe_id: num(pick(o, "enveloppe_id")),
     categorie_id: categorieId == null ? null : num(categorieId),
     libelle: str(o.libelle),
-    montant: num(o.montant),
+    montant: num(pick(o, "montant_ttc") ?? o.montant),
     date_depense: dateOnly(pick(o, "date_depense")) ?? "",
     fournisseur: strOrNull(o.fournisseur),
     reference_piece: strOrNull(pick(o, "reference_piece")),
-    statut: (str(o.statut) || "en_attente") as BudgetDepenseStatut,
+    statut: normalizeDepenseStatut(str(o.statut)),
     commentaire: strOrNull(o.commentaire),
     created_at: dateTime(pick(o, "created_at")),
     enveloppe_libelle: str(pick(o, "enveloppe_libelle") ?? enveloppe.libelle) || undefined,

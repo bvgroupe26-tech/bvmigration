@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import BottomNavBar from "@/components/layout/BottomNavBar";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
+import WorkspaceSwitcher from "@/components/layout/WorkspaceSwitcher";
 import { EMPLOYEE_MOBILE_TABS, EMPLOYEE_NAV, getEmployeePageTitle, isNavActive } from "@/lib/nav-config";
 import { useAuth } from "@/context/AuthContext";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
@@ -104,6 +105,7 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
         </nav>
 
         <div className="border-t border-white/10 px-4 py-4">
+          <WorkspaceSwitcher variant="dark" className="mb-3" />
           <div className="flex items-center gap-3 rounded-xl px-2 py-2">
             <div
               className={cn(
@@ -155,6 +157,7 @@ export default function EmployeeMobileShell({ user, children }: EmployeeMobileSh
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                <WorkspaceSwitcher variant="light" className="lg:hidden" />
                 <NotificationsBell context="employee" />
                 <Link
                   href="/employee/profile"

@@ -154,8 +154,9 @@ export async function uploadAvatar(file: File) {
   return normalizeEmployeMe(result);
 }
 
+/** Toujours sur la fiche du compte connecté, y compris pour un RH dans « Mon espace ». */
 export async function createAbsence(body: CreateAbsenceInput) {
-  return apiPost<EmployeeAbsence>("/absences", body);
+  return apiPost<EmployeeAbsence>("/absences/me", body);
 }
 
 export async function cancelAbsence(id: number) {

@@ -56,17 +56,8 @@ export function proxy(req: NextRequest) {
 
   const role = parseRoleFromToken(legacyToken);
 
-  // Espace employé : réservé aux employés et au staff RH/manager/admin (souvent aussi fiches employé).
-  if (
-    pathname.startsWith("/employee") &&
-    role &&
-    role !== "employee" &&
-    role !== "admin" &&
-    role !== "manager" &&
-    role !== "rh"
-  ) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
-  }
+  // Espace employé (/employee) : ouvert aux employés et au staff. Le JWT ne porte pas la fiche
+  // liée, c'est AuthGuard qui renvoie vers /dashboard un staff sans fiche employé.
 
   // Lien RH / notification / push vers /paie/:id → espace employé (évite renvoi à l'accueil).
   const paieDetailMatch = pathname.match(/^\/paie\/(\d+)$/);

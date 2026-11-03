@@ -22,6 +22,7 @@ import { normalizeEmploye } from "@/lib/employe-utils";
 import { prepareEmployeApiPayload } from "@/lib/employe-payload";
 import { usePostes } from "@/hooks/usePostes";
 import { localDateISO } from "@/lib/date-local";
+import { useAuth } from "@/context/AuthContext";
 
 const DEPARTEMENT_SUGGESTIONS = [
   "Tech",
@@ -45,6 +46,9 @@ type FormData = RegisterEmployeeInput;
 
 export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFormProps) {
   const isEdit = !!employe;
+  const { user } = useAuth();
+  // Séparation des pouvoirs : sur sa propre fiche, un RH ne modifie que ses coordonnées.
+  const isSelf = isEdit && user?.employeId != null && user.employeId === employe?.id;
   const [withAccount, setWithAccount] = useState(!isEdit);
   const [showPwd, setShowPwd] = useState(false);
   const [showPwdConfirm, setShowPwdConfirm] = useState(false);
@@ -237,15 +241,28 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
         </p>
       ) : null}
 
+      {isSelf && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-950">
+          <strong>C&apos;est votre propre fiche.</strong> Vous pouvez modifier vos coordonnées
+          (téléphone, adresse, situation familiale). Rémunération, poste, contrat et statut doivent être
+          modifiés par un autre membre RH ou administrateur.
+        </p>
+      )}
+
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Prénom" required error={errors.prenom?.message}>
-          <Input placeholder="Jean" {...register("prenom")} />
+          <Input placeholder="Jean" readOnly={isSelf} {...register("prenom")} />
         </Field>
         <Field label="Nom" required error={errors.nom?.message}>
-          <Input placeholder="Dupont" {...register("nom")} />
+          <Input placeholder="Dupont" readOnly={isSelf} {...register("nom")} />
         </Field>
         <Field label="Email" required error={errors.email?.message}>
-          <Input type="email" placeholder="jean.dupont@bvgroupe.com" {...register("email")} />
+          <Input
+            type="email"
+            placeholder="jean.dupont@bvgroupe.com"
+            readOnly={isSelf}
+            {...register("email")}
+          />
         </Field>
         <Field label="Téléphone" required error={errors.telephone?.message}>
           <Input placeholder="+241 06 12 34 56" {...register("telephone")} />
@@ -293,7 +310,7 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
         )}
 
         <Field label="Date de naissance">
-          <Input type="date" {...register("date_naissance")} />
+          <Input type="date" readOnly={isSelf} {...register("date_naissance")} />
         </Field>
         <Field label="Adresse">
           <Input placeholder="Libreville, Gabon" {...register("adresse")} />
@@ -308,13 +325,13 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
           </NativeSelect>
         </Field>
         <Field label="Nombre d'enfants">
-          <Input type="number" min={0} {...register("nombre_enfants")} />
+          <Input type="number" min={0} readOnly={isSelf} {...register("nombre_enfants")} />
         </Field>
       </div>
 
       <div className="h-px bg-slate-200" />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <fieldset disabled={isSelf} className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Poste" required error={errors.poste?.message}>
           <Controller
             name="poste"
@@ -395,10 +412,10 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
             <option value="suspendu">Suspendu</option>
           </NativeSelect>
         </Field>
-      </div>
+      </fieldset>
 
       {!withAccount && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+        <fieldset disabled={isSelf} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
           <h3 className="text-sm font-semibold text-slate-900">Éléments de paie par défaut</h3>
           <p className="mt-1 text-xs text-text-secondary">
             Par défaut tous les montants ci-dessous sont à <strong>0</strong> (rien n&apos;est prérempli). Ils sont repris à la
@@ -457,7 +474,7 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
               <Input type="number" step="0.0001" min={0} max={1} placeholder="0.10" {...register("def_taux_impot")} />
             </Field>
           </div>
-        </div>
+        </fieldset>
       )}
 
       {!isEdit && withAccount && (

@@ -16,7 +16,11 @@ import BudgetDepenseForm from "@/components/forms/BudgetDepenseForm";
 import { useBudgetDepenses, useBudgetEnveloppes, useBudgetCategories } from "@/hooks/api";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import { formatFCFA } from "@/lib/utils";
-import { isDefaultBudgetEnveloppe } from "@/lib/budget-depense-utils";
+import {
+  DEPENSE_STATUT_LABELS,
+  depenseStatutBadgeVariant,
+  isDefaultBudgetEnveloppe,
+} from "@/lib/budget-depense-utils";
 import type { BudgetDepense } from "@/lib/types";
 
 export default function BudgetDepensesPage() {
@@ -40,13 +44,6 @@ export default function BudgetDepensesPage() {
       toast.error(getUserErrorMessage(e));
     }
   }
-
-  const badgeVariant = (s: BudgetDepense["statut"]) => {
-    if (s === "paye") return "paye" as const;
-    if (s === "approuve") return "approuve" as const;
-    if (s === "refuse") return "refuse" as const;
-    return "en_attente" as const;
-  };
 
   const columns: Column<BudgetDepense>[] = [
     {
@@ -80,7 +77,9 @@ export default function BudgetDepensesPage() {
     {
       key: "statut",
       header: "Statut",
-      render: (d) => <StatBadge variant={badgeVariant(d.statut)}>{d.statut.replace("_", " ")}</StatBadge>,
+      render: (d) => (
+        <StatBadge variant={depenseStatutBadgeVariant(d.statut)}>{DEPENSE_STATUT_LABELS[d.statut]}</StatBadge>
+      ),
     },
     {
       key: "actions",
@@ -88,18 +87,18 @@ export default function BudgetDepensesPage() {
       align: "right",
       render: (d) => (
         <div className="flex flex-wrap justify-end gap-1">
-          {d.statut === "en_attente" && (
+          {d.statut === "soumise" && (
             <>
-              <Button type="button" variant="ghost" className="h-8 px-2 text-emerald-700" onClick={() => setStatutRow(d, "approuve")} title="Approuver">
+              <Button type="button" variant="ghost" className="h-8 px-2 text-emerald-700" onClick={() => setStatutRow(d, "validee")} title="Valider">
                 <Check className="h-4 w-4" />
               </Button>
-              <Button type="button" variant="ghost" className="h-8 px-2 text-red-600" onClick={() => setStatutRow(d, "refuse")} title="Refuser">
+              <Button type="button" variant="ghost" className="h-8 px-2 text-red-600" onClick={() => setStatutRow(d, "refusee")} title="Refuser">
                 <X className="h-4 w-4" />
               </Button>
             </>
           )}
-          {d.statut === "approuve" && (
-            <Button type="button" variant="ghost" className="h-8 px-2 text-[#2F5F9D]" onClick={() => setStatutRow(d, "paye")} title="Marquer payé">
+          {d.statut === "validee" && (
+            <Button type="button" variant="ghost" className="h-8 px-2 text-[#2F5F9D]" onClick={() => setStatutRow(d, "payee")} title="Marquer payée">
               Payé
             </Button>
           )}
@@ -144,7 +143,7 @@ export default function BudgetDepensesPage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium text-slate-600">Filtrer :</span>
-        {(["all", "en_attente", "approuve", "paye", "refuse"] as const).map((s) => (
+        {(["all", "soumise", "validee", "payee", "refusee"] as const).map((s) => (
           <button
             key={s}
             type="button"
@@ -153,7 +152,7 @@ export default function BudgetDepensesPage() {
               statut === s ? "bv-tab-active" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
             }`}
           >
-            {s === "all" ? "Tous" : s.replace("_", " ")}
+            {s === "all" ? "Tous" : DEPENSE_STATUT_LABELS[s]}
           </button>
         ))}
       </div>

@@ -106,6 +106,14 @@ function normalizeUserMe(raw: unknown): UserMePayload {
   const employe =
     o.employe && typeof o.employe === "object" ? (o.employe as Record<string, unknown>) : null;
   const avatarRaw = o.avatar ?? o.avatarUrl ?? employe?.avatar ?? employe?.avatarUrl;
+  const employeId =
+    o.employeId != null
+      ? Number(o.employeId)
+      : o.employe_id != null
+        ? Number(o.employe_id)
+        : employe?.id != null
+          ? Number(employe.id)
+          : null;
   return {
     ...(raw as UserMePayload),
     id: Number(o.id ?? 0),
@@ -113,14 +121,9 @@ function normalizeUserMe(raw: unknown): UserMePayload {
     role: extractRoleField(o),
     nom: String(o.nom ?? ""),
     prenom: String(o.prenom ?? ""),
-    employeId:
-      o.employeId != null
-        ? Number(o.employeId)
-        : o.employe_id != null
-          ? Number(o.employe_id)
-          : employe?.id != null
-            ? Number(employe.id)
-            : null,
+    employeId,
+    hasEmployeProfile:
+      typeof o.hasEmployeProfile === "boolean" ? o.hasEmployeProfile : employeId != null && employeId > 0,
     matricule: (o.matricule ?? employe?.matricule) as string | null | undefined,
     poste: (o.poste ?? employe?.poste) as string | null | undefined,
     departement: (o.departement ?? employe?.departement) as string | null | undefined,

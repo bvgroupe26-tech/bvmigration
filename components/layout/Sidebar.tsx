@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { LogOut } from "lucide-react";
 import { ADMIN_NAV, isNavActive } from "@/lib/nav-config";
 import { filterNavForRole } from "@/lib/roles";
+import WorkspaceSwitcher from "@/components/layout/WorkspaceSwitcher";
 import { cn, getInitials, getAvatarGradient } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
@@ -135,6 +136,7 @@ export default function Sidebar({ user, desktop = false, className }: SidebarPro
         </nav>
 
         <div className="border-t border-white/10 px-4 py-4">
+          <WorkspaceSwitcher variant="dark" className="mb-3" />
           <div className="flex items-center gap-2">
             <Link
               href="/profile"

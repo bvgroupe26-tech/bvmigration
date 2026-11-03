@@ -363,7 +363,9 @@ export const budgetDepenseSchema = z.object({
   date_depense: z.string().min(8, "Date requise"),
   fournisseur: z.string().optional().or(z.literal("")),
   reference_piece: z.string().optional().or(z.literal("")),
-  statut: z.enum(["en_attente", "approuve", "refuse", "paye"]).default("en_attente"),
+  statut: z
+    .enum(["brouillon", "soumise", "validee_n1", "validee", "refusee", "payee", "annulee"])
+    .default("soumise"),
   commentaire: z.string().optional().or(z.literal("")),
 });
 export type BudgetDepenseInput = z.infer<typeof budgetDepenseSchema>;

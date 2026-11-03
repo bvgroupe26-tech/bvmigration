@@ -62,7 +62,7 @@ export default function BudgetDepenseForm({
       date_depense: depense?.date_depense || localDateISO(),
       fournisseur: depense?.fournisseur ?? "",
       reference_piece: depense?.reference_piece ?? "",
-      statut: depense?.statut ?? "en_attente",
+      statut: depense?.statut ?? "soumise",
       commentaire: depense?.commentaire ?? "",
       categorie_id: depense?.categorie_id ?? undefined,
     },
@@ -144,10 +144,10 @@ export default function BudgetDepenseForm({
         </Field>
         <Field label="Statut">
           <NativeSelect {...register("statut")}>
-            <option value="en_attente">En attente</option>
-            <option value="approuve">Approuvé</option>
-            <option value="refuse">Refusé</option>
-            <option value="paye">Payé</option>
+            <option value="soumise">Soumise</option>
+            <option value="validee">Validée</option>
+            <option value="refusee">Refusée</option>
+            <option value="payee">Payée</option>
           </NativeSelect>
         </Field>
       </div>

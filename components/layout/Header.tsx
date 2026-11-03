@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
+import WorkspaceSwitcher from "@/components/layout/WorkspaceSwitcher";
 import { useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useProfilePhoto } from "@/hooks/useProfilePhoto";
@@ -107,6 +108,7 @@ export default function Header({ desktop = false }: HeaderProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <WorkspaceSwitcher variant="light" className="hidden sm:inline-flex" />
           <NotificationsBell context="admin" />
           {user && (
             <Link

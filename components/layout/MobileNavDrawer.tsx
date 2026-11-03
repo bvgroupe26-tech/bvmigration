@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { isNavActive, type NavItem } from "@/lib/nav-config";
+import WorkspaceSwitcher from "@/components/layout/WorkspaceSwitcher";
 
 type MobileNavDrawerProps = {
   open: boolean;
@@ -56,6 +57,9 @@ export default function MobileNavDrawer({
               >
                 <X className="h-4 w-4" />
               </button>
+            </div>
+            <div className="px-3 pt-3 empty:hidden">
+              <WorkspaceSwitcher variant="drawer" />
             </div>
             <ul className="overflow-y-auto px-3 py-3 pb-6">
               {items.map((item) => {
