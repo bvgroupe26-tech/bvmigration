@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from "@/lib/api-client";
+import { apiGet, apiPut } from "@/lib/apiClient";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
