@@ -1,174 +1,265 @@
 "use client";
 
-import { useEffect } from "react";
-import { useForm, type Resolver } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { budgetDepenseSchema, type BudgetDepenseInput } from "@/lib/schemas";
-import { apiClient, getUserErrorMessage } from "@/lib/fetcher";
-import {
-  DEFAULT_BUDGET_ENVELOPPE_LABEL,
-  depenseToApiPayload,
-  isDefaultBudgetEnveloppe,
-  resolveEnveloppeIdForDepense,
-} from "@/lib/budget-depense-utils";
-import { localDateISO } from "@/lib/date-local";
 import { Field, Input, NativeSelect, Textarea } from "@/components/ui/Field";
+import MoneyInput from "@/components/ui/MoneyInput";
 import Button from "@/components/ui/Button";
-import type { BudgetDepense, BudgetEnveloppe, BudgetCategorie } from "@/lib/types";
+import FournisseurPicker from "@/components/budget/FournisseurPicker";
+import { createDepense, updateDepense, type DepensePayload } from "@/lib/budget-api";
+import { computeTva, needsJustificatif } from "@/lib/budget-depense-utils";
+import { getUserErrorMessage } from "@/lib/api-errors";
+import { localDateISO } from "@/lib/date-local";
+import { formatFCFA } from "@/lib/utils";
+import type {
+  CategorieFinance,
+  DepenseFinance,
+  EnveloppeFinance,
+  ParametresFinance,
+} from "@/lib/types-finance";
 
 type Props = {
-  depense?: BudgetDepense | null;
-  enveloppes: BudgetEnveloppe[];
-  categories: BudgetCategorie[];
+  depense?: DepenseFinance | null;
+  enveloppes: EnveloppeFinance[];
+  categories: CategorieFinance[];
+  parametres?: ParametresFinance | null;
+  /** Le référentiel fournisseurs est réservé au staff. */
+  allowFournisseur?: boolean;
   defaultEnveloppeId?: number;
-  onSuccess?: () => void;
+  onSuccess?: (depenseId: number | null) => void;
   onCancel?: () => void;
 };
 
-function initialEnveloppeId(
-  depense: BudgetDepense | null | undefined,
-  defaultEnveloppeId?: number
-): number | undefined {
-  if (depense) {
-    if (isDefaultBudgetEnveloppe(depense.enveloppe_libelle)) return undefined;
-    return depense.enveloppe_id > 0 ? depense.enveloppe_id : undefined;
+type FormState = {
+  libelle: string;
+  enveloppeId: number | "";
+  categorieId: number | "";
+  fournisseurId: number | null;
+  fournisseurNom: string | null;
+  montantHt: number;
+  tauxTva: number;
+  dateDepense: string;
+  referencePiece: string;
+  commentaire: string;
+};
+
+type Errors = Partial<Record<keyof FormState, string>>;
+
+function createdId(raw: unknown): number | null {
+  if (raw && typeof raw === "object" && "id" in raw) {
+    const n = Number((raw as { id: unknown }).id);
+    return Number.isFinite(n) && n > 0 ? n : null;
   }
-  return defaultEnveloppeId && defaultEnveloppeId > 0 ? defaultEnveloppeId : undefined;
+  return null;
 }
 
 export default function BudgetDepenseForm({
   depense,
   enveloppes,
   categories,
+  parametres,
+  allowFournisseur = true,
   defaultEnveloppeId,
   onSuccess,
   onCancel,
 }: Props) {
   const isEdit = !!depense;
-  const dedicatedEnveloppes = enveloppes.filter((e) => !isDefaultBudgetEnveloppe(e.libelle));
+  const tvaDefaut = parametres?.taux_tva_defaut ?? 18;
+  const [form, setForm] = useState<FormState>(() => ({
+    libelle: depense?.libelle ?? "",
+    enveloppeId: depense?.enveloppe_id || defaultEnveloppeId || "",
+    categorieId: depense?.categorie_id ?? "",
+    fournisseurId: depense?.fournisseur_id ?? null,
+    fournisseurNom: depense?.fournisseur_nom ?? null,
+    montantHt: depense?.montant_ht ?? 0,
+    tauxTva: depense ? depense.taux_tva : tvaDefaut,
+    dateDepense: depense?.date_depense || localDateISO(),
+    referencePiece: depense?.reference_piece ?? "",
+    commentaire: depense?.commentaire ?? "",
+  }));
+  const [errors, setErrors] = useState<Errors>({});
+  const [submitting, setSubmitting] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<BudgetDepenseInput>({
-    resolver: zodResolver(budgetDepenseSchema) as unknown as Resolver<BudgetDepenseInput>,
-    defaultValues: {
-      enveloppe_id: initialEnveloppeId(depense, defaultEnveloppeId),
-      libelle: depense?.libelle ?? "",
-      montant: depense?.montant ?? 0,
-      date_depense: depense?.date_depense || localDateISO(),
-      fournisseur: depense?.fournisseur ?? "",
-      reference_piece: depense?.reference_piece ?? "",
-      statut: depense?.statut ?? "soumise",
-      commentaire: depense?.commentaire ?? "",
-      categorie_id: depense?.categorie_id ?? undefined,
-    },
-  });
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setErrors((e) => ({ ...e, [key]: undefined }));
+  };
 
-  useEffect(() => {
-    if (!depense) return;
-    reset({
-      enveloppe_id: initialEnveloppeId(depense),
-      libelle: depense.libelle,
-      montant: depense.montant,
-      date_depense: depense.date_depense,
-      fournisseur: depense.fournisseur ?? "",
-      reference_piece: depense.reference_piece ?? "",
-      statut: depense.statut,
-      commentaire: depense.commentaire ?? "",
-      categorie_id: depense.categorie_id ?? undefined,
-    });
-  }, [depense, reset]);
+  const annee = Number(form.dateDepense.slice(0, 4)) || new Date().getFullYear();
+  const enveloppesDispo = useMemo(
+    () =>
+      enveloppes.filter(
+        (e) => (e.statut === "actif" && e.annee === annee) || e.id === depense?.enveloppe_id
+      ),
+    [enveloppes, annee, depense?.enveloppe_id]
+  );
+  const montants = computeTva(form.montantHt, form.tauxTva);
+  const justificatif = needsJustificatif(montants.ttc, parametres);
+  const enveloppeHorsExercice =
+    form.enveloppeId !== "" && !enveloppesDispo.some((e) => e.id === form.enveloppeId);
+
+  function validate(): Errors {
+    const e: Errors = {};
+    if (form.libelle.trim().length < 2) e.libelle = "Libellé requis";
+    if (form.enveloppeId === "") e.enveloppeId = "Choisissez l'enveloppe à imputer";
+    else if (enveloppeHorsExercice) e.enveloppeId = `Cette enveloppe n'est pas active sur l'exercice ${annee}`;
+    if (!(form.montantHt > 0)) e.montantHt = "Montant HT > 0 requis";
+    if (form.tauxTva < 0 || form.tauxTva > 100) e.tauxTva = "Taux entre 0 et 100";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.dateDepense)) e.dateDepense = "Date requise";
+    return e;
+  }
+
+  async function onSubmit(ev: React.FormEvent) {
+    ev.preventDefault();
+    const e = validate();
+    setErrors(e);
+    if (Object.values(e).some(Boolean)) return;
+
+    const payload: DepensePayload = {
+      enveloppeId: Number(form.enveloppeId),
+      categorieId: form.categorieId === "" ? null : Number(form.categorieId),
+      fournisseurId: allowFournisseur ? form.fournisseurId : (depense?.fournisseur_id ?? null),
+      libelle: form.libelle.trim(),
+      montantHt: montants.ht,
+      tauxTva: form.tauxTva,
+      dateDepense: form.dateDepense,
+      referencePiece: form.referencePiece.trim() || undefined,
+      commentaire: form.commentaire.trim() || undefined,
+    };
+
+    setSubmitting(true);
+    try {
+      if (isEdit) {
+        await updateDepense(depense.id, payload);
+        toast.success("Dépense mise à jour");
+        onSuccess?.(depense.id);
+      } else {
+        const raw = await createDepense(payload);
+        toast.success("Brouillon enregistré. Ajoutez les justificatifs puis soumettez-le.");
+        onSuccess?.(createdId(raw));
+      }
+    } catch (err) {
+      toast.error(getUserErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
-    <form
-      onSubmit={handleSubmit(async (data) => {
-        try {
-          const annee = Number(data.date_depense.slice(0, 4)) || new Date().getFullYear();
-          const enveloppeId = await resolveEnveloppeIdForDepense(data.enveloppe_id, annee);
-          const payload = depenseToApiPayload(data as Record<string, unknown>, enveloppeId);
+    <form onSubmit={onSubmit} className="space-y-4" noValidate>
+      {!isEdit ? (
+        <p className="rounded-xl border border-[#d9e4f5] bg-[#f4f8ff] px-3 py-2 text-xs text-[#1F3F73]">
+          La dépense est créée en <strong>brouillon</strong>. Vous pourrez joindre la facture ou le reçu, puis la
+          soumettre pour validation.
+        </p>
+      ) : null}
 
-          if (isEdit) {
-            // En édition, une catégorie vidée doit être détachée explicitement côté API.
-            await apiClient.put(`/budget/depenses/${depense.id}`, {
-              categorieId: null,
-              ...payload,
-            });
-          } else {
-            await apiClient.post("/budget/depenses", payload);
-          }
-
-          toast.success(isEdit ? "Dépense mise à jour" : "Dépense enregistrée");
-          onSuccess?.();
-        } catch (e) {
-          toast.error(getUserErrorMessage(e));
-        }
-      })}
-      className="space-y-4"
-    >
-      <p className="rounded-xl border border-[#d9e4f5] bg-[#f4f8ff] px-3 py-2 text-xs text-[#1F3F73]">
-        Saisissez directement une dépense sur le budget global. L&apos;enveloppe est optionnelle si vous
-        souhaitez ventiler sur un poste précis.
-      </p>
-
-      <Field label="Catégorie" hint="Recommandé pour classer la dépense">
-        <NativeSelect {...register("categorie_id")}>
-          <option value="">— Aucune —</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.code} — {c.libelle}
-            </option>
-          ))}
-        </NativeSelect>
-      </Field>
-
-      <Field label="Libellé de la dépense" required error={errors.libelle?.message}>
-        <Input {...register("libelle")} placeholder="Ex. Achat fournitures bureau" />
+      <Field label="Libellé de la dépense" required error={errors.libelle}>
+        <Input
+          value={form.libelle}
+          onChange={(e) => set("libelle", e.target.value)}
+          placeholder="Ex. Achat fournitures bureau"
+        />
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Montant (FCFA)" required error={errors.montant?.message}>
-          <Input type="number" min={1} step={1000} {...register("montant")} />
+        <Field label="Date de la dépense" required error={errors.dateDepense}>
+          <Input type="date" value={form.dateDepense} onChange={(e) => set("dateDepense", e.target.value)} />
         </Field>
-        <Field label="Date" required error={errors.date_depense?.message}>
-          <Input type="date" {...register("date_depense")} />
-        </Field>
-        <Field label="Fournisseur" error={errors.fournisseur?.message}>
-          <Input {...register("fournisseur")} />
-        </Field>
-        <Field label="Réf. facture / pièce" error={errors.reference_piece?.message}>
-          <Input {...register("reference_piece")} />
-        </Field>
-        <Field label="Statut">
-          <NativeSelect {...register("statut")}>
-            <option value="soumise">Soumise</option>
-            <option value="validee">Validée</option>
-            <option value="refusee">Refusée</option>
-            <option value="payee">Payée</option>
+        <Field
+          label="Enveloppe budgétaire"
+          required
+          error={errors.enveloppeId}
+          hint={enveloppesDispo.length === 0 ? `Aucune enveloppe active pour ${annee}` : undefined}
+        >
+          <NativeSelect
+            value={form.enveloppeId}
+            onChange={(e) => set("enveloppeId", e.target.value ? Number(e.target.value) : "")}
+          >
+            <option value="">— Choisir —</option>
+            {enveloppesDispo.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.libelle}
+                {e.departement ? ` · ${e.departement}` : ""} ({e.annee})
+              </option>
+            ))}
           </NativeSelect>
         </Field>
+        <Field label="Catégorie" hint="Détermine le compte SYSCOHADA">
+          <NativeSelect
+            value={form.categorieId}
+            onChange={(e) => set("categorieId", e.target.value ? Number(e.target.value) : "")}
+          >
+            <option value="">— Aucune —</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.code} — {c.libelle}
+                {c.compte_syscohada ? ` (${c.compte_syscohada})` : ""}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+        {allowFournisseur ? (
+          <Field label="Fournisseur">
+            <FournisseurPicker
+              value={form.fournisseurId}
+              label={form.fournisseurNom}
+              onChange={(id, nom) => {
+                set("fournisseurId", id);
+                set("fournisseurNom", nom);
+              }}
+            />
+          </Field>
+        ) : (
+          <Field label="Réf. facture / reçu">
+            <Input value={form.referencePiece} onChange={(e) => set("referencePiece", e.target.value)} />
+          </Field>
+        )}
       </div>
 
-      <Field
-        label="Enveloppe (optionnel)"
-        hint="Laissez « Budget global » si vous ne ventilez pas par enveloppe"
-        error={errors.enveloppe_id?.message}
-      >
-        <NativeSelect {...register("enveloppe_id")}>
-          <option value="">{DEFAULT_BUDGET_ENVELOPPE_LABEL} — sans enveloppe dédiée</option>
-          {dedicatedEnveloppes.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.libelle} ({e.annee})
-            </option>
-          ))}
-        </NativeSelect>
-      </Field>
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Montant HT (FCFA)" required error={errors.montantHt}>
+            <MoneyInput value={form.montantHt} onChange={(v) => set("montantHt", v)} />
+          </Field>
+          <Field label="TVA (%)" error={errors.tauxTva} hint={`Défaut : ${tvaDefaut} %`}>
+            <Input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              max={100}
+              step="any"
+              value={Number.isFinite(form.tauxTva) ? form.tauxTva : ""}
+              onChange={(e) => set("tauxTva", e.target.value === "" ? 0 : Number(e.target.value))}
+            />
+          </Field>
+          <div className="flex flex-col justify-end gap-1 text-sm">
+            <div className="flex justify-between text-slate-600">
+              <span>TVA</span>
+              <span className="font-mono">{formatFCFA(montants.tva)}</span>
+            </div>
+            <div className="flex justify-between border-t border-slate-200 pt-1 font-semibold text-slate-900">
+              <span>Total TTC</span>
+              <span className="font-mono">{formatFCFA(montants.ttc)}</span>
+            </div>
+          </div>
+        </div>
+        {justificatif ? (
+          <p className="mt-3 text-xs font-medium text-amber-800">
+            Au-delà de {formatFCFA(parametres?.seuil_justificatif ?? 0)}, une pièce justificative sera exigée à la
+            soumission.
+          </p>
+        ) : null}
+      </div>
 
-      <Field label="Commentaire" error={errors.commentaire?.message}>
-        <Textarea rows={3} {...register("commentaire")} />
+      {allowFournisseur ? (
+        <Field label="Réf. facture / pièce">
+          <Input value={form.referencePiece} onChange={(e) => set("referencePiece", e.target.value)} />
+        </Field>
+      ) : null}
+
+      <Field label="Commentaire">
+        <Textarea rows={3} value={form.commentaire} onChange={(e) => set("commentaire", e.target.value)} />
       </Field>
 
       <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
@@ -177,8 +268,8 @@ export default function BudgetDepenseForm({
             Annuler
           </Button>
         ) : null}
-        <Button type="submit" variant="primary" loading={isSubmitting}>
-          {isEdit ? "Enregistrer" : "Enregistrer la dépense"}
+        <Button type="submit" variant="primary" loading={submitting}>
+          {isEdit ? "Enregistrer" : "Créer le brouillon"}
         </Button>
       </div>
     </form>

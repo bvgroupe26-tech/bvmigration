@@ -1,17 +1,9 @@
 "use client";
 
-import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, Legend, Tooltip, XAxis, YAxis } from "recharts";
 import { formatFCFA } from "@/lib/utils";
 import ChartContainer from "@/components/ui/ChartContainer";
-import type { BudgetSynthese } from "@/lib/types";
+import type { SyntheseFinance } from "@/lib/types-finance";
 
 const CHART_TT = {
   contentStyle: {
@@ -23,31 +15,33 @@ const CHART_TT = {
 };
 
 type Props = {
-  data: BudgetSynthese["depenses_par_mois"];
+  data: SyntheseFinance["depenses_par_mois"];
 };
+
+function compact(v: number): string {
+  if (Math.abs(v) >= 1_000_000) return `${Math.round(v / 100_000) / 10} M`;
+  if (Math.abs(v) >= 1_000) return `${Math.round(v / 1_000)} k`;
+  return String(v);
+}
 
 export default function BudgetMonthlyChart({ data }: Props) {
   return (
     <ChartContainer height={280} className="mt-4">
-      <ComposedChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+      <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,23,42,0.06)" vertical={false} />
-        <XAxis
-          dataKey="label"
-          tick={{ fontSize: 10, fill: "#64748b" }}
-          interval={1}
-          axisLine={false}
-          tickLine={false}
-        />
+        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} />
         <YAxis
           tick={{ fontSize: 11, fill: "#64748b" }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
+          tickFormatter={(v) => compact(Number(v))}
+          width={48}
         />
-        <Tooltip {...CHART_TT} formatter={(value) => [formatFCFA(Number(value)), ""]} />
+        <Tooltip {...CHART_TT} formatter={(value, name) => [formatFCFA(Number(value)), String(name)]} />
         <Legend wrapperStyle={{ fontSize: 12 }} />
-        <Bar dataKey="montant" fill="#6366f1" name="Montant (FCFA)" radius={[4, 4, 0, 0]} />
-      </ComposedChart>
+        <Bar dataKey="realise" stackId="m" fill="#1F3F73" name="Réalisé (payé)" />
+        <Bar dataKey="engage" stackId="m" fill="#93b4e0" name="Engagé (validé)" radius={[4, 4, 0, 0]} />
+      </BarChart>
     </ChartContainer>
   );
 }

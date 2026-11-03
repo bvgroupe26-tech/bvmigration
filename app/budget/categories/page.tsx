@@ -12,20 +12,35 @@ import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Skeleton from "@/components/ui/Skeleton";
 import BudgetCategoryForm from "@/components/forms/BudgetCategoryForm";
-import { useBudgetCategories } from "@/hooks/api";
-import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
-import type { BudgetCategorie } from "@/lib/types";
+import { useFinanceCategories } from "@/hooks/budget";
+import { apiClient } from "@/lib/fetcher";
+import { getUserErrorMessage } from "@/lib/api-errors";
+import type { CategorieFinance } from "@/lib/types-finance";
 
 export default function BudgetCategoriesPage() {
-  const { categories, isLoading, mutate } = useBudgetCategories();
+  const { categories, isLoading, mutate } = useFinanceCategories();
   const [showAdd, setShowAdd] = useState(false);
-  const [editing, setEditing] = useState<BudgetCategorie | null>(null);
-  const [deleting, setDeleting] = useState<BudgetCategorie | null>(null);
+  const [editing, setEditing] = useState<CategorieFinance | null>(null);
+  const [deleting, setDeleting] = useState<CategorieFinance | null>(null);
   const [busyDel, setBusyDel] = useState(false);
 
-  const columns: Column<BudgetCategorie>[] = [
-    { key: "code", header: "Code", render: (c) => <span className="font-mono font-semibold text-slate-900">{c.code}</span> },
+  const columns: Column<CategorieFinance>[] = [
+    {
+      key: "code",
+      header: "Code",
+      render: (c) => <span className="font-mono font-semibold text-slate-900">{c.code}</span>,
+    },
     { key: "libelle", header: "Libellé", render: (c) => c.libelle },
+    {
+      key: "compte",
+      header: "Compte SYSCOHADA",
+      render: (c) =>
+        c.compte_syscohada ? (
+          <span className="font-mono text-sm text-slate-800">{c.compte_syscohada}</span>
+        ) : (
+          <span className="text-xs font-medium text-amber-700">Non renseigné</span>
+        ),
+    },
     {
       key: "desc",
       header: "Description",
@@ -54,7 +69,7 @@ export default function BudgetCategoriesPage() {
     try {
       await apiClient.del(`/budget/categories/${deleting.id}`);
       toast.success("Catégorie supprimée");
-      mutate();
+      void mutate();
       setDeleting(null);
     } catch (e) {
       toast.error(getUserErrorMessage(e));
@@ -63,18 +78,26 @@ export default function BudgetCategoriesPage() {
     }
   }
 
+  const sansCompte = categories.filter((c) => !c.compte_syscohada).length;
+
   return (
     <div className="space-y-6">
       <BudgetSubNav />
       <SectionHeader
         title="Catégories de dépenses"
-        subtitle="Classifiez les dépenses (formation, IT, recrutement, etc.)"
+        subtitle="Classification des dépenses et rattachement au plan comptable SYSCOHADA"
         actions={
           <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setShowAdd(true)}>
             Nouvelle catégorie
           </Button>
         }
       />
+      {sansCompte > 0 ? (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {sansCompte} catégorie{sansCompte > 1 ? "s n'ont" : " n'a"} pas de compte SYSCOHADA : l&apos;export comptable
+          sera incomplet.
+        </p>
+      ) : null}
       <GlassCard className="p-0">
         {isLoading ? (
           <Skeleton className="h-64 w-full" />
@@ -83,38 +106,40 @@ export default function BudgetCategoriesPage() {
             columns={columns}
             data={categories}
             rowKey={(c) => c.id}
-            emptyMessage="Aucune catégorie. Créez-en une pour lier vos dépenses."
+            emptyMessage="Aucune catégorie. Créez-en une pour classer vos dépenses."
           />
         )}
       </GlassCard>
 
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Nouvelle catégorie">
-        <BudgetCategoryForm
-          onCancel={() => setShowAdd(false)}
-          onSuccess={() => {
-            mutate();
-            setShowAdd(false);
-          }}
-        />
+        {showAdd ? (
+          <BudgetCategoryForm
+            onCancel={() => setShowAdd(false)}
+            onSuccess={() => {
+              void mutate();
+              setShowAdd(false);
+            }}
+          />
+        ) : null}
       </Modal>
       <Modal open={!!editing} onClose={() => setEditing(null)} title="Modifier la catégorie">
-        {editing && (
+        {editing ? (
           <BudgetCategoryForm
             categorie={editing}
             onCancel={() => setEditing(null)}
             onSuccess={() => {
-              mutate();
+              void mutate();
               setEditing(null);
             }}
           />
-        )}
+        ) : null}
       </Modal>
       <ConfirmDialog
         open={!!deleting}
         onClose={() => setDeleting(null)}
         onConfirm={confirmDelete}
         title="Supprimer la catégorie ?"
-        description={deleting ? `« ${deleting.code} — ${deleting.libelle} » sera supprimée si aucune dépense ne l’utilise.` : ""}
+        description={deleting ? `« ${deleting.code} — ${deleting.libelle} » sera supprimée si aucune dépense ne l'utilise.` : ""}
         confirmLabel="Supprimer"
         variant="danger"
         loading={busyDel}

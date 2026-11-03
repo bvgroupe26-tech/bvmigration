@@ -29,6 +29,11 @@ import {
 import { BV_AUTH_READY_EVENT } from "@/lib/pwa-install";
 
 const PUBLIC_PATHS = new Set(["/", "/login", "/offline"]);
+const PUBLIC_PREFIXES = ["/verify/"];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.has(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+}
 const AUTH_FETCH_TIMEOUT_MS = 20_000;
 
 type AuthContextValue = {
@@ -329,14 +334,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isAuthenticated || isLoading) return;
-    if (PUBLIC_PATHS.has(pathname) || pathname === "/offline") return;
+    if (isPublicPath(pathname)) return;
     persistLastRoute(pathname);
   }, [isAuthenticated, isLoading, pathname]);
 
   useEffect(() => {
     if (isLoading) return;
 
-    const isPublic = PUBLIC_PATHS.has(pathname);
+    const isPublic = isPublicPath(pathname);
 
     if (!isAuthenticated && !isPublic && !suppressLoginRedirect) {
       router.replace(`/login?from=${encodeURIComponent(pathname)}`);
@@ -386,7 +391,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user, isAuthenticated, isLoading, isReconnecting, login, logout, refreshSession]
   );
 
-  if (isLoading && !PUBLIC_PATHS.has(pathname) && !user) {
+  if (isLoading && !isPublicPath(pathname) && !user) {
     return (
       <AuthContext.Provider value={value}>
         <AuthLoading />

@@ -10,6 +10,8 @@ type BulletinPaieSheetProps = {
   showStatutBadge?: boolean;
   className?: string;
   id?: string;
+  matricule?: string | null;
+  employeurNom?: string | null;
 };
 
 export default function BulletinPaieSheet({
@@ -17,6 +19,8 @@ export default function BulletinPaieSheet({
   showStatutBadge = true,
   className,
   id = "bulletin-paie-feuille",
+  matricule,
+  employeurNom,
 }: BulletinPaieSheetProps) {
   const totalPrimes =
     bulletin.prime_transport +
@@ -27,7 +31,6 @@ export default function BulletinPaieSheet({
   const brut = bulletin.salaire_base + totalPrimes;
   const moisLabel = formatMoisPaie(String(bulletin.mois), bulletin.annee);
   const prorataLabel = formatProrata(bulletin);
-  const matricule = `EMP-${String(bulletin.employe_id).padStart(5, "0")}`;
   const datePaiement = bulletin.date_paiement
     ? new Date(bulletin.date_paiement.includes("T") ? bulletin.date_paiement : `${bulletin.date_paiement}T12:00:00`).toLocaleDateString("fr-FR")
     : null;
@@ -42,7 +45,7 @@ export default function BulletinPaieSheet({
     >
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-6 py-5 print:gap-2 print:px-0 print:py-2">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 print:text-[9px]">BV Groupe</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 print:text-[9px]">{employeurNom || "BV Groupe"}</p>
           <h1 className="font-display text-xl font-bold tracking-tight text-slate-900 print:text-lg">
             Bulletin de paie
           </h1>
@@ -80,7 +83,7 @@ export default function BulletinPaieSheet({
             <dl className="mt-1 grid grid-cols-1 gap-x-8 gap-y-0.5 text-xs text-slate-600 sm:grid-cols-2 print:mt-0.5">
               <div className="flex gap-2">
                 <dt className="shrink-0 text-slate-500">Matricule</dt>
-                <dd className="font-mono text-slate-900">{matricule}</dd>
+                <dd className="font-mono text-slate-900">{matricule || "—"}</dd>
               </div>
               <div className="flex gap-2">
                 <dt className="shrink-0 text-slate-500">Poste</dt>

@@ -12,7 +12,8 @@ import {
   type EmployeInput,
   type RegisterEmployeeInput,
 } from "@/lib/schemas";
-import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
+import { apiClient, fetcher, getUserErrorMessage } from "@/lib/fetcher";
+import { MODE_PAIEMENT_LABELS, type ModePaiement } from "@/lib/types-paie";
 import { apiFetch } from "@/lib/apiClient";
 import { Field, Input, NativeSelect } from "@/components/ui/Field";
 import MoneyInput from "@/components/ui/MoneyInput";
@@ -44,6 +45,52 @@ type EmployeFormProps = {
 
 type FormData = RegisterEmployeeInput;
 
+const PAIE_FIELD_KEYS = ["numeroCnss", "niu", "categorie", "echelon", "modePaiement", "banque", "rib", "mobileMoney"] as const;
+type PaieFieldKey = (typeof PAIE_FIELD_KEYS)[number];
+type PaieFields = Record<PaieFieldKey, string>;
+
+const EMPTY_PAIE_FIELDS: PaieFields = {
+  numeroCnss: "",
+  niu: "",
+  categorie: "",
+  echelon: "",
+  modePaiement: "",
+  banque: "",
+  rib: "",
+  mobileMoney: "",
+};
+
+function readPaieFields(raw: unknown): PaieFields {
+  const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const snake: Record<PaieFieldKey, string> = {
+    numeroCnss: "numero_cnss",
+    niu: "niu",
+    categorie: "categorie",
+    echelon: "echelon",
+    modePaiement: "mode_paiement",
+    banque: "banque",
+    rib: "rib",
+    mobileMoney: "mobile_money",
+  };
+  const out = { ...EMPTY_PAIE_FIELDS };
+  for (const k of PAIE_FIELD_KEYS) {
+    const v = o[k] ?? o[snake[k]];
+    out[k] = v == null ? "" : String(v);
+  }
+  return out;
+}
+
+/** N'envoie que les champs renseignés, ou null pour vider un champ existant. */
+function paieFieldsPayload(current: PaieFields, initial: PaieFields): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  for (const k of PAIE_FIELD_KEYS) {
+    const v = current[k].trim();
+    if (v) out[k] = v;
+    else if (initial[k].trim()) out[k] = null;
+  }
+  return out;
+}
+
 export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFormProps) {
   const isEdit = !!employe;
   const { user } = useAuth();
@@ -52,6 +99,27 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
   const [withAccount, setWithAccount] = useState(!isEdit);
   const [showPwd, setShowPwd] = useState(false);
   const [showPwdConfirm, setShowPwdConfirm] = useState(false);
+  const [paieFields, setPaieFields] = useState<PaieFields>(EMPTY_PAIE_FIELDS);
+  const [initialPaieFields, setInitialPaieFields] = useState<PaieFields>(EMPTY_PAIE_FIELDS);
+  const employeId = employe?.id;
+
+  useEffect(() => {
+    if (!employeId) return;
+    let cancelled = false;
+    fetcher<unknown>(`/employes/${employeId}`)
+      .then((raw) => {
+        if (cancelled) return;
+        const fields = readPaieFields(raw);
+        setPaieFields(fields);
+        setInitialPaieFields(fields);
+      })
+      .catch(() => {
+        /* champs de paie optionnels : la fiche reste éditable */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [employeId]);
 
   const schema = !isEdit && withAccount ? registerEmployeeSchema : employeSchema;
 
@@ -138,10 +206,10 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
     try {
       if (isEdit) {
         const { password: _p, password_confirm: _pc, ...employeData } = data;
-        const raw = await apiClient.put<unknown>(
-          `/employes/${employe.id}`,
-          prepareEmployeApiPayload(employeData)
-        );
+        const raw = await apiClient.put<unknown>(`/employes/${employe.id}`, {
+          ...prepareEmployeApiPayload(employeData),
+          ...(isSelf ? {} : paieFieldsPayload(paieFields, initialPaieFields)),
+        });
         const result = normalizeEmploye(raw);
         toast.success(`${result.prenom} ${result.nom} mis à jour`);
         onSuccess?.(result);
@@ -187,10 +255,10 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
         }
       } else {
         const { password: _p, password_confirm: _pc, ...employeData } = data;
-        const raw = await apiClient.post<unknown>(
-          "/employes",
-          prepareEmployeApiPayload(employeData)
-        );
+        const raw = await apiClient.post<unknown>("/employes", {
+          ...prepareEmployeApiPayload(employeData),
+          ...paieFieldsPayload(paieFields, EMPTY_PAIE_FIELDS),
+        });
         const result = normalizeEmploye(raw);
         toast.success(`${result.prenom} ${result.nom} ajouté(e)`);
         onSuccess?.(result);
@@ -413,6 +481,72 @@ export default function EmployeForm({ employe, onSuccess, onCancel }: EmployeFor
           </NativeSelect>
         </Field>
       </fieldset>
+
+      {!withAccount && (
+        <fieldset disabled={isSelf} className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-900">Identification paie et mode de paiement</h3>
+          <p className="mt-1 text-xs text-text-secondary">
+            Mentions reprises sur le bulletin de paie et utilisées pour l&apos;ordre de virement.
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="N° CNSS">
+              <Input
+                className="font-mono"
+                value={paieFields.numeroCnss}
+                onChange={(e) => setPaieFields({ ...paieFields, numeroCnss: e.target.value })}
+              />
+            </Field>
+            <Field label="NIU">
+              <Input
+                className="font-mono"
+                value={paieFields.niu}
+                onChange={(e) => setPaieFields({ ...paieFields, niu: e.target.value })}
+              />
+            </Field>
+            <Field label="Catégorie" hint="Selon la convention collective">
+              <Input value={paieFields.categorie} onChange={(e) => setPaieFields({ ...paieFields, categorie: e.target.value })} />
+            </Field>
+            <Field label="Échelon">
+              <Input value={paieFields.echelon} onChange={(e) => setPaieFields({ ...paieFields, echelon: e.target.value })} />
+            </Field>
+            <Field label="Mode de paiement">
+              <NativeSelect
+                value={paieFields.modePaiement}
+                onChange={(e) => setPaieFields({ ...paieFields, modePaiement: e.target.value })}
+              >
+                <option value="">—</option>
+                {(Object.keys(MODE_PAIEMENT_LABELS) as ModePaiement[]).map((m) => (
+                  <option key={m} value={m}>
+                    {MODE_PAIEMENT_LABELS[m]}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+            {paieFields.modePaiement === "virement" || paieFields.modePaiement === "cheque" ? (
+              <>
+                <Field label="Banque">
+                  <Input value={paieFields.banque} onChange={(e) => setPaieFields({ ...paieFields, banque: e.target.value })} />
+                </Field>
+                <Field label="RIB" className="sm:col-span-2">
+                  <Input
+                    className="font-mono"
+                    value={paieFields.rib}
+                    onChange={(e) => setPaieFields({ ...paieFields, rib: e.target.value })}
+                  />
+                </Field>
+              </>
+            ) : paieFields.modePaiement === "mobile_money" ? (
+              <Field label="Numéro Mobile Money">
+                <Input
+                  className="font-mono"
+                  value={paieFields.mobileMoney}
+                  onChange={(e) => setPaieFields({ ...paieFields, mobileMoney: e.target.value })}
+                />
+              </Field>
+            ) : null}
+          </div>
+        </fieldset>
+      )}
 
       {!withAccount && (
         <fieldset disabled={isSelf} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/80 p-4">

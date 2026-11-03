@@ -29,7 +29,7 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  if (PUBLIC_PAGES.has(pathname)) {
+  if (PUBLIC_PAGES.has(pathname) || pathname.startsWith("/verify/")) {
     return NextResponse.next();
   }
 

@@ -25,7 +25,6 @@ export default function PaieGenerationPage() {
   const [resultOpen, setResultOpen] = useState(false);
 
   const { employes } = useEmployes({ statut: "actif", limit: 500 });
-  const selectedEmploye = employes.find((e) => e.id === selectedEmployeId);
   const periodeLabel = `${MOIS_NOMS[parseInt(mois, 10) - 1]} ${annee}`;
 
   async function go() {

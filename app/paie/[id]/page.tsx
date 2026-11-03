@@ -1,97 +1,118 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { use } from "react";
+import { useEffect, useState, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, CheckCircle2, XCircle, Printer, Pencil, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Printer, Pencil, X, FileDown, Undo2 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import GlassCard from "@/components/ui/GlassCard";
 import Skeleton from "@/components/ui/Skeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { Field, Input } from "@/components/ui/Field";
 import BulletinPaieSheet from "@/components/paie/BulletinPaieSheet";
-import { usePaieDetail } from "@/hooks/api";
-import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
+import BulletinLignesSheet from "@/components/paie/BulletinLignesSheet";
+import { useBulletin, downloadBulletinPdf, paieActions } from "@/hooks/paie";
+import { apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import { refreshNotificationsCache } from "@/hooks/useNotifications";
 import { paieMontantsFormSchema, type PaieMontantsFormInput } from "@/lib/schemas";
-import { calcSalaireNet } from "@/lib/paie-calc";
-import type { Paie } from "@/lib/types";
+import { normalizeBulletinDetail } from "@/lib/types-paie";
+
+type LegacyAction = "paye" | "annule" | null;
+
+const MONTANT_FIELDS: Array<{ name: keyof PaieMontantsFormInput; label: string }> = [
+  { name: "salaire_base", label: "Salaire de base" },
+  { name: "prime_transport", label: "Prime transport" },
+  { name: "prime_logement", label: "Prime logement" },
+  { name: "prime_performance", label: "Prime performance" },
+  { name: "autres_primes", label: "Autres primes" },
+  { name: "cnss", label: "CNSS" },
+  { name: "impot", label: "Impôt sur le revenu" },
+  { name: "autres_retenues", label: "Autres retenues" },
+];
 
 export default function BulletinDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { bulletin, isLoading, mutate } = usePaieDetail(id);
+  const router = useRouter();
+  const { bulletin, isLoading, error, mutate } = useBulletin(id);
   const [editing, setEditing] = useState(false);
-  const [pendingStatut, setPendingStatut] = useState<"paye" | "annule" | null>(null);
-  const [changingStatut, setChangingStatut] = useState(false);
+  const [pendingStatut, setPendingStatut] = useState<LegacyAction>(null);
+  const [confirmContre, setConfirmContre] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const {
     register,
     handleSubmit,
     reset,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<PaieMontantsFormInput>({
     resolver: zodResolver(paieMontantsFormSchema) as unknown as Resolver<PaieMontantsFormInput>,
-    defaultValues: {
-      salaire_base: 0,
-      prime_transport: 0,
-      prime_logement: 0,
-      prime_performance: 0,
-      autres_primes: 0,
-      cnss: 0,
-      impot: 0,
-      autres_retenues: 0,
-    },
   });
 
   useEffect(() => {
-    if (!bulletin) return;
+    if (!bulletin || bulletin.moteur !== "legacy") return;
+    const l = bulletin.legacy;
     reset({
-      salaire_base: bulletin.salaire_base,
-      prime_transport: bulletin.prime_transport,
-      prime_logement: bulletin.prime_logement,
-      prime_performance: bulletin.prime_performance,
-      autres_primes: bulletin.autres_primes,
-      cnss: bulletin.cnss,
-      impot: bulletin.impot,
-      autres_retenues: bulletin.autres_retenues,
+      salaire_base: l.salaire_base,
+      prime_transport: l.prime_transport,
+      prime_logement: l.prime_logement,
+      prime_performance: l.prime_performance,
+      autres_primes: l.autres_primes,
+      cnss: l.cnss,
+      impot: l.impot,
+      autres_retenues: l.autres_retenues,
     });
   }, [bulletin, reset]);
 
-  const w = watch();
-  const previewNet = calcSalaireNet({
-    salaire_base: Number(w.salaire_base) || 0,
-    prime_transport: Number(w.prime_transport) || 0,
-    prime_logement: Number(w.prime_logement) || 0,
-    prime_performance: Number(w.prime_performance) || 0,
-    autres_primes: Number(w.autres_primes) || 0,
-    cnss: Number(w.cnss) || 0,
-    impot: Number(w.impot) || 0,
-    autres_retenues: Number(w.autres_retenues) || 0,
-  });
-
   async function changeStatut(statut: "paye" | "annule") {
-    setChangingStatut(true);
+    setBusy(true);
     try {
       await apiClient.put(`/paie/${id}`, { statut });
       toast.success(`Bulletin ${statut === "paye" ? "marqué payé" : "annulé"}`);
       setPendingStatut(null);
-      mutate();
+      await mutate();
       void refreshNotificationsCache();
     } catch (err) {
       toast.error(getUserErrorMessage(err));
     } finally {
-      setChangingStatut(false);
+      setBusy(false);
+    }
+  }
+
+  async function contreBulletin() {
+    setBusy(true);
+    try {
+      const created = normalizeBulletinDetail(await paieActions.contreBulletin(Number(id)));
+      toast.success("Contre-bulletin créé");
+      setConfirmContre(false);
+      if (created.id) router.push(`/paie/${created.id}`);
+      else await mutate();
+    } catch (err) {
+      toast.error(getUserErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function downloadPdf() {
+    if (!bulletin) return;
+    setDownloading(true);
+    try {
+      await downloadBulletinPdf(bulletin.id, bulletin.numero);
+    } catch (err) {
+      toast.error(getUserErrorMessage(err, "Impossible de télécharger le PDF."));
+    } finally {
+      setDownloading(false);
     }
   }
 
   const saveMontants = handleSubmit(async (data) => {
     try {
-      await apiClient.put<Paie>(`/paie/${id}`, data);
+      await apiClient.put(`/paie/${id}`, data);
       toast.success("Bulletin mis à jour");
       await mutate();
       setEditing(false);
@@ -104,13 +125,18 @@ export default function BulletinDetailPage({ params }: { params: Promise<{ id: s
   if (!bulletin) {
     return (
       <GlassCard className="p-12 text-center">
-        <p className="text-text-secondary">Bulletin introuvable</p>
+        <p className="text-text-secondary">{error ? getUserErrorMessage(error) : "Bulletin introuvable"}</p>
         <Link href="/paie" className="mt-4 inline-block text-sm font-medium text-[#2F5F9D] hover:text-[#1F3F73]">
           ← Retour
         </Link>
       </GlassCard>
     );
   }
+
+  const isLegacy = bulletin.moteur === "legacy";
+  const canContre =
+    !isLegacy && bulletin.type !== "contre_bulletin" && (bulletin.statut === "valide" || bulletin.statut === "paye");
+  const backHref = bulletin.periodId ? `/paie/periodes/${bulletin.periodId}` : "/paie";
 
   return (
     <div className="space-y-5">
@@ -119,11 +145,11 @@ export default function BulletinDetailPage({ params }: { params: Promise<{ id: s
         animate={{ opacity: 1, y: 0 }}
         className="no-print flex flex-wrap items-center justify-between gap-3"
       >
-        <Link href="/paie" className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-slate-900">
+        <Link href={backHref} className="inline-flex items-center gap-2 text-sm text-text-secondary hover:text-slate-900">
           <ArrowLeft className="h-4 w-4" /> Retour
         </Link>
         <div className="flex flex-wrap items-center gap-2">
-          {bulletin.statut === "en_attente" && !editing && (
+          {isLegacy && bulletin.statut === "en_attente" && !editing && (
             <>
               <Button variant="ghost" icon={<Pencil className="h-4 w-4" />} onClick={() => setEditing(true)}>
                 Modifier les montants
@@ -146,68 +172,83 @@ export default function BulletinDetailPage({ params }: { params: Promise<{ id: s
               </Button>
             </>
           )}
-          {!editing && (
-            <Button variant="ghost" icon={<Printer className="h-4 w-4" />} onClick={() => window.print()}>
-              Imprimer
+          {canContre && (
+            <Button variant="danger" icon={<Undo2 className="h-4 w-4" />} onClick={() => setConfirmContre(true)}>
+              Contre-bulletin
             </Button>
+          )}
+          {!editing && (
+            <>
+              <Button variant="primary" icon={<FileDown className="h-4 w-4" />} onClick={downloadPdf} loading={downloading}>
+                Télécharger le PDF
+              </Button>
+              <Button variant="ghost" icon={<Printer className="h-4 w-4" />} onClick={() => window.print()}>
+                Imprimer
+              </Button>
+            </>
           )}
         </div>
       </motion.div>
 
-      {editing && (
+      {bulletin.annuleBulletinId && (
+        <div className="no-print rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Ce bulletin annule le{" "}
+          <Link href={`/paie/${bulletin.annuleBulletinId}`} className="font-semibold underline">
+            bulletin d&apos;origine
+          </Link>
+          .
+        </div>
+      )}
+
+      {editing && isLegacy && (
         <GlassCard className="no-print p-6">
           <h2 className="text-sm font-semibold text-slate-900">Saisie des montants (FCFA)</h2>
-          <p className="mt-1 text-xs text-text-secondary">
-            Ajustez chaque ligne ; le net est recalculé côté serveur à l&apos;enregistrement.
-          </p>
+          <p className="mt-1 text-xs text-text-secondary">Le net est recalculé par le serveur à l&apos;enregistrement.</p>
           <form id="form-paie-montants" onSubmit={saveMontants} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Salaire de base" error={errors.salaire_base?.message}>
-              <Input type="number" inputMode="numeric" min={0} step="any" placeholder="0" {...register("salaire_base")} />
-            </Field>
-            <Field label="Prime transport" error={errors.prime_transport?.message}>
-              <Input type="number" inputMode="numeric" min={0} step="any" placeholder="0" {...register("prime_transport")} />
-            </Field>
-            <Field label="Prime logement" error={errors.prime_logement?.message}>
-              <Input type="number" inputMode="numeric" min={0} step="any" placeholder="0" {...register("prime_logement")} />
-            </Field>
-            <Field label="Prime performance" error={errors.prime_performance?.message}>
-              <Input type="number" inputMode="numeric" min={0} step="any" placeholder="0" {...register("prime_performance")} />
-            </Field>
-            <Field label="Autres primes" error={errors.autres_primes?.message}>
-              <Input type="number" inputMode="numeric" min={0} step="any" placeholder="0" {...register("autres_primes")} />
-            </Field>
-            <Field label="CNSS" error={errors.cnss?.message}>
-              <Input type="number" inputMode="numeric" min={0} step="any" placeholder="0" {...register("cnss")} />
-            </Field>
-            <Field label="Impôt sur le revenu" error={errors.impot?.message}>
-              <Input type="number" inputMode="numeric" min={0} step="any" placeholder="0" {...register("impot")} />
-            </Field>
-            <Field label="Autres retenues" error={errors.autres_retenues?.message}>
-              <Input type="number" inputMode="numeric" min={0} step="any" placeholder="0" {...register("autres_retenues")} />
-            </Field>
-            <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              Net estimé (aperçu) :{" "}
-              <span className="font-mono font-semibold text-slate-900">{previewNet.toLocaleString("fr-FR")} F CFA</span>
-            </div>
+            {MONTANT_FIELDS.map((f) => (
+              <Field key={f.name} label={f.label} error={errors[f.name]?.message}>
+                <Input type="number" inputMode="numeric" min={0} step="1" placeholder="0" {...register(f.name)} />
+              </Field>
+            ))}
           </form>
         </GlassCard>
       )}
 
-      <BulletinPaieSheet bulletin={bulletin} />
+      {isLegacy ? (
+        <BulletinPaieSheet
+          bulletin={bulletin.legacy}
+          matricule={bulletin.employe.matricule}
+          employeurNom={bulletin.employeur?.raisonSociale}
+        />
+      ) : (
+        <BulletinLignesSheet bulletin={bulletin} />
+      )}
 
       <ConfirmDialog
         open={pendingStatut !== null}
         onClose={() => setPendingStatut(null)}
         onConfirm={() => (pendingStatut ? changeStatut(pendingStatut) : undefined)}
-        loading={changingStatut}
+        loading={busy}
         variant={pendingStatut === "annule" ? "danger" : "warning"}
         title={pendingStatut === "paye" ? "Marquer ce bulletin comme payé ?" : "Annuler ce bulletin ?"}
         description={
           pendingStatut === "paye"
             ? "L'employé sera notifié et le bulletin deviendra visible dans son espace. Ses montants ne pourront plus être modifiés."
-            : "Le bulletin sera exclu de la masse salariale. Cette action ne se fait pas depuis un bulletin déjà payé, sauf par un administrateur."
+            : "Le bulletin sera exclu de la masse salariale."
         }
         confirmLabel={pendingStatut === "paye" ? "Marquer payé" : "Annuler le bulletin"}
+        cancelLabel="Retour"
+      />
+
+      <ConfirmDialog
+        open={confirmContre}
+        onClose={() => setConfirmContre(false)}
+        onConfirm={contreBulletin}
+        loading={busy}
+        variant="danger"
+        title="Émettre un contre-bulletin ?"
+        description="Un bulletin inverse (montants négatifs) est créé pour annuler celui-ci. Le bulletin d'origine reste archivé. Établissez ensuite un rappel si un nouveau montant est dû."
+        confirmLabel="Créer le contre-bulletin"
         cancelLabel="Retour"
       />
     </div>
