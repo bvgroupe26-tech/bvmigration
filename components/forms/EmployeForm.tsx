@@ -13,7 +13,7 @@ import {
   type RegisterEmployeeInput,
 } from "@/lib/schemas";
 import {apiClient, getUserErrorMessage } from "@/lib/fetcher";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch } from "@/lib/apiClient";
 import { Field, Input, NativeSelect } from "@/components/ui/Field";
 import MoneyInput from "@/components/ui/MoneyInput";
 import Button from "@/components/ui/Button";

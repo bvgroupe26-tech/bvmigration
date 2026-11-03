@@ -75,7 +75,7 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  serverExternalPackages: ["better-sqlite3", "electron"],
+  serverExternalPackages: ["electron"],
   async rewrites() {
     const target = apiProxyTarget.replace(/\/$/, "");
     return [

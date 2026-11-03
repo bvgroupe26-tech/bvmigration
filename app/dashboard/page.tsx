@@ -96,6 +96,43 @@ function buildDashboardEmployeColumns(): Column<Employe>[] {
   ];
 }
 
+function csvCell(value: unknown): string {
+  const s = value == null ? "" : String(value);
+  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function exportDashboardCsv(
+  stats: ReturnType<typeof useDashboardStats>["stats"],
+  employes: Employe[]
+) {
+  const rows: unknown[][] = [
+    ["Indicateur", "Valeur"],
+    ["Total employés", stats?.total_employes ?? 0],
+    ["Présents aujourd'hui", stats?.presents_aujourd_hui ?? 0],
+    ["Masse salariale", stats?.masse_salariale ?? 0],
+    ["Recrutements ouverts", stats?.recrutements_ouverts ?? 0],
+    [],
+    ["Derniers employés ajoutés"],
+    ["Nom", "Prénom", "Poste", "Département", "Contrat", "Date d'entrée", "Statut"],
+    ...employes.map((e) => [
+      e.nom,
+      e.prenom,
+      e.poste ?? "",
+      e.departement ?? "",
+      e.type_contrat ?? "",
+      e.date_embauche ? new Date(e.date_embauche).toLocaleDateString("fr-FR") : "",
+      e.statut,
+    ]),
+  ];
+  const csv = "﻿" + rows.map((r) => r.map(csvCell).join(";")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tableau-de-bord-${new Date().toLocaleDateString("fr-CA")}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function DashboardPage() {
   const { openPanel } = useEmployeePanel();
   const { stats, isLoading: loadingStats, mutate: mutateStats } = useDashboardStats();
@@ -125,7 +162,12 @@ export default function DashboardPage() {
         transition={{ duration: 0.4 }}
         className="flex flex-wrap items-center justify-end gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
       >
-        <Button variant="ghost" icon={<Download className="h-4 w-4" />}>
+        <Button
+          variant="ghost"
+          icon={<Download className="h-4 w-4" />}
+          disabled={loadingStats || loadingEmp}
+          onClick={() => exportDashboardCsv(stats, employes)}
+        >
           Exporter
         </Button>
         <Button variant="primary" icon={<Plus className="h-4 w-4" />} onClick={() => setShowAddModal(true)}>

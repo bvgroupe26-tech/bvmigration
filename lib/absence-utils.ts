@@ -127,7 +127,7 @@ export function normalizeAbsence(raw: unknown): Absence {
   );
 
   const dureeJours = num(pick(o, "duree_jours", "dureeJours") ?? pick(o, "nb_jours", "nbJours"));
-  let dateDebut = dates.debut;
+  const dateDebut = dates.debut;
   let dateFin = dates.fin;
   if ((!dateDebut || !dateFin) && dureeJours > 0 && dateDebut) {
     const fin = new Date(dateDebut);

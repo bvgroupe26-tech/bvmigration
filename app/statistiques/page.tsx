@@ -70,28 +70,44 @@ export default function StatistiquesPage() {
   const { synthese, isLoading, mutate } = useStatistiquesSynthese();
   const [tab, setTab] = useState<TabId>("vue");
 
-  const paie = synthese?.paie ?? {
-    evolution_mensuelle: [] as Array<Record<string, number | string>>,
-    cumul_net_annee: 0,
-    annee_courante: new Date().getFullYear(),
-    mois_courant: new Date().getMonth() + 1,
-  };
-  const presence = synthese?.presence ?? {
-    serie_mensuelle: [] as Array<Record<string, number | string>>,
-    aujourd_hui: { present: 0, absent: 0, retard: 0 },
-    absences_en_attente: 0,
-  };
-  const recrutement = synthese?.recrutement ?? {
-    candidatures_par_statut: { recu: 0, en_cours: 0, retenu: 0, rejete: 0, total: 0 },
-    offres: { ouverte: 0, fermee: 0, pourvue: 0 },
-    taux_retenu_pct: 0,
-  };
-  const performance = synthese?.performance ?? {
-    moyennes: { ponctualite: 0, qualite_travail: 0, travail_equipe: 0, initiative: 0, note_globale: 0 },
-    evaluations_12_mois: 0,
-    repartition_notes: [] as Array<Record<string, number | string>>,
-    evolution_mensuelle: [] as Array<Record<string, number | string>>,
-  };
+  const paie = useMemo(
+    () =>
+      synthese?.paie ?? {
+        evolution_mensuelle: [] as Array<Record<string, number | string>>,
+        cumul_net_annee: 0,
+        annee_courante: new Date().getFullYear(),
+        mois_courant: new Date().getMonth() + 1,
+      },
+    [synthese]
+  );
+  const presence = useMemo(
+    () =>
+      synthese?.presence ?? {
+        serie_mensuelle: [] as Array<Record<string, number | string>>,
+        aujourd_hui: { present: 0, absent: 0, retard: 0 },
+        absences_en_attente: 0,
+      },
+    [synthese]
+  );
+  const recrutement = useMemo(
+    () =>
+      synthese?.recrutement ?? {
+        candidatures_par_statut: { recu: 0, en_cours: 0, retenu: 0, rejete: 0, total: 0 },
+        offres: { ouverte: 0, fermee: 0, pourvue: 0 },
+        taux_retenu_pct: 0,
+      },
+    [synthese]
+  );
+  const performance = useMemo(
+    () =>
+      synthese?.performance ?? {
+        moyennes: { ponctualite: 0, qualite_travail: 0, travail_equipe: 0, initiative: 0, note_globale: 0 },
+        evaluations_12_mois: 0,
+        repartition_notes: [] as Array<Record<string, number | string>>,
+        evolution_mensuelle: [] as Array<Record<string, number | string>>,
+      },
+    [synthese]
+  );
   const rh = synthese?.rh ?? {
     total_par_statut: { actif: 0, inactif: 0, suspendu: 0 },
     masse_brute_mensuelle_fcfa: 0,

@@ -8,6 +8,10 @@ const eslintConfig = defineConfig([
   {
     rules: {
       "react-hooks/set-state-in-effect": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },
+      ],
     },
   },
   // Override default ignores of eslint-config-next.
@@ -17,12 +21,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Service worker généré par next-pwa
-    "public/sw.js",
-    "public/workbox-*.js",
-    "public/worker-*.js",
-    "public/fallback-*.js",
-    "public/swe-worker-*.js",
+    "public/**",
+    ".claude/**",
   ]),
 ]);
 

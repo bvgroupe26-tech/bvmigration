@@ -13,9 +13,10 @@ export default function WelcomeSplash() {
   const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAuth();
   const [canLeave, setCanLeave] = useState(false);
-  const startedAt = useRef(Date.now());
+  const startedAt = useRef<number | null>(null);
 
   useEffect(() => {
+    startedAt.current ??= Date.now();
     if (isLoading) return;
     const wait = Math.max(0, MIN_DISPLAY_MS - (Date.now() - startedAt.current));
     const timer = window.setTimeout(() => setCanLeave(true), wait);
