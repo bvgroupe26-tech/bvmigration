@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarClock, Clock, FileText, Bell, ChevronRight } from "lucide-react";
+import { CalendarClock, Clock, FileText, Bell, ChevronRight, Wallet, Receipt } from "lucide-react";
 import {
   useAbsenceBalance,
   useAuthMe,
@@ -35,6 +35,20 @@ const shortcuts = [
     href: "/employee/documents",
     icon: FileText,
     color: "bg-[#E8F0FA] text-[#2F5F9D]",
+  },
+  {
+    title: "Mes bulletins",
+    description: "Bulletins de paie payés, en PDF",
+    href: "/employee/paie",
+    icon: Wallet,
+    color: "bg-violet-50 text-violet-700",
+  },
+  {
+    title: "Notes de frais",
+    description: "Déclarer et suivre mes dépenses",
+    href: "/employee/depenses",
+    icon: Receipt,
+    color: "bg-rose-50 text-rose-700",
   },
   {
     title: "Notifications",

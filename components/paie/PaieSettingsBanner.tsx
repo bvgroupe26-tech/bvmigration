@@ -43,6 +43,12 @@ export default function PaieSettingsBanner({ statut, unavailable }: Props) {
                   <span className="font-mono">{statut.parametresManquants.join(", ")}</span>
                 </p>
               )}
+              {statut.baremesManquants.length > 0 && (
+                <p className="mt-1 text-xs">
+                  <span className="font-semibold">Barèmes à saisir :</span>{" "}
+                  <span className="font-mono">{statut.baremesManquants.join(", ")}</span>
+                </p>
+              )}
               {statut.employeurIncomplet.length > 0 && (
                 <p className="mt-1 text-xs">
                   <span className="font-semibold">Fiche employeur :</span>{" "}

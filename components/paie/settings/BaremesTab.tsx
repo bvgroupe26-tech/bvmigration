@@ -12,7 +12,7 @@ import { Field, Input } from "@/components/ui/Field";
 import { useTaxBrackets } from "@/hooks/paie";
 import { apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import { localDateISO } from "@/lib/date-local";
-import { formatMontant, type TaxBracket } from "@/lib/types-paie";
+import { formatMontant, formatTaux, type TaxBracket } from "@/lib/types-paie";
 
 type Draft = { id: number | null; bareme: string; borneMin: string; borneMax: string; taux: string; dateDebut: string };
 
@@ -100,7 +100,7 @@ export default function BaremesTab({ canWrite, onSaved }: { canWrite: boolean; o
       <GlassCard className="flex flex-wrap items-center justify-between gap-3 p-5">
         <p className="max-w-2xl text-xs text-text-secondary">
           Barèmes progressifs (par exemple l&apos;IRPP). Chaque tranche applique son taux à la part du revenu comprise entre
-          ses bornes. Borne maximale vide = tranche ouverte. Taux en décimal : 0,10 = 10 %.
+          ses bornes. Borne maximale vide = tranche ouverte. Taux en pourcentage : 10 = 10 %.
         </p>
         {canWrite && (
           <Button variant="primary" size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => newTranche()}>
@@ -152,8 +152,7 @@ export default function BaremesTab({ canWrite, onSaved }: { canWrite: boolean; o
                       <td className="px-3 py-2 font-mono">{formatMontant(t.borneMin)}</td>
                       <td className="px-3 py-2 font-mono">{t.borneMax != null ? formatMontant(t.borneMax) : "et plus"}</td>
                       <td className="px-3 py-2 text-right font-mono">
-                        {t.taux.toLocaleString("fr-FR", { maximumFractionDigits: 4 })}
-                        <span className="ml-1 text-slate-400">({(t.taux * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %)</span>
+                        {formatTaux(t.taux)}
                       </td>
                       {canWrite && (
                         <td className="px-3 py-2 text-right">
@@ -211,7 +210,7 @@ export default function BaremesTab({ canWrite, onSaved }: { canWrite: boolean; o
               <Field label="Borne maximale (F)" hint="Vide = tranche ouverte">
                 <Input inputMode="numeric" value={draft.borneMax} className="font-mono" onChange={(e) => setDraft({ ...draft, borneMax: e.target.value })} />
               </Field>
-              <Field label="Taux" required hint="0,10 = 10 %">
+              <Field label="Taux" required hint="En % : 10 = 10 %">
                 <Input inputMode="decimal" value={draft.taux} className="font-mono" onChange={(e) => setDraft({ ...draft, taux: e.target.value })} />
               </Field>
             </div>

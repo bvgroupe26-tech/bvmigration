@@ -37,7 +37,7 @@ export default function BudgetCategoryForm({ categorie, onSuccess, onCancel }: P
     if (!/^[A-Z0-9_-]{1,32}$/.test(code)) e.code = "Code alphanumérique (ex. FORMATION)";
     if (form.libelle.trim().length < 2) e.libelle = "Libellé requis";
     const compte = form.compteSyscohada.trim();
-    if (compte && !/^\d{2,8}$/.test(compte)) e.compteSyscohada = "Numéro de compte : 2 à 8 chiffres (ex. 6052)";
+    if (compte && !/^6\d{1,7}$/.test(compte)) e.compteSyscohada = "Compte de charges de classe 6, 2 à 8 chiffres (ex. 6052)";
     setErrors(e);
     if (Object.values(e).some(Boolean)) return;
 

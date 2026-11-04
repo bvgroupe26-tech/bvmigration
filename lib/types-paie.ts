@@ -86,7 +86,7 @@ export function formatMontant(v: number | null | undefined): string {
 
 export function formatTaux(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return "";
-  return `${(v * 100).toLocaleString("fr-FR", { maximumFractionDigits: 3 })} %`;
+  return `${v.toLocaleString("fr-FR", { maximumFractionDigits: 4 })} %`;
 }
 
 export type PeriodBulletinRow = {
@@ -267,6 +267,7 @@ export type EmployeeRubrique = {
 export type PaieSettingsStatut = {
   pret: boolean;
   parametresManquants: string[];
+  baremesManquants: string[];
   employeurIncomplet: string[];
 };
 
@@ -578,6 +579,7 @@ export function normalizeSettingsStatut(raw: unknown): PaieSettingsStatut {
   return {
     pret: bool(o.pret),
     parametresManquants: list(o.parametresManquants),
+    baremesManquants: list(o.baremesManquants),
     employeurIncomplet: list(o.employeurIncomplet),
   };
 }
@@ -594,8 +596,9 @@ export function normalizeVerify(raw: unknown): VerifyBulletinResult {
   };
 }
 
-export function isAConfirmer(p: Pick<PayParameter, "description" | "valeur">): boolean {
-  return (p.description ?? "").toUpperCase().includes("À CONFIRMER") || p.valeur === 0;
+/** Même règle que le moteur : 0 est une valeur valide, seule la mention « À CONFIRMER » bloque. */
+export function isAConfirmer(p: Pick<PayParameter, "description">): boolean {
+  return /[àa]\s*confirmer/i.test(p.description ?? "");
 }
 
 export function bulletinStatutBadge(s: BulletinStatut): "brouillon" | "info" | "warning" | "paye" | "annule" | "en_attente" {

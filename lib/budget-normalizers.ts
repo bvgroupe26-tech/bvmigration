@@ -149,12 +149,13 @@ export function normalizeDepenseFinance(raw: unknown): DepenseFinance {
   const o = rec(raw);
   const enveloppe = rec(o.enveloppe);
   const categorie = rec(o.categorie);
-  const fournisseurObj = rec(o.fournisseur);
+  // Référentiel : relation `fournisseurRef` ; `fournisseur` reste le nom libre (ancien champ texte).
+  const fournisseurObj = rec(pick(o, "fournisseur_ref") ?? (typeof o.fournisseur === "object" ? o.fournisseur : null));
   const fournisseurTexte = typeof o.fournisseur === "string" ? o.fournisseur : null;
   const ttc = num(pick(o, "montant_ttc") ?? o.montant);
   const ht = numOrNull(pick(o, "montant_ht")) ?? ttc;
   const categorieId = pick(o, "categorie_id");
-  const fournisseurId = pick(o, "fournisseur_id");
+  const fournisseurId = pick(o, "fournisseur_id") ?? fournisseurObj.id;
   const demandeurId = pick(o, "demandeur_id");
   const id = num(o.id);
   return {

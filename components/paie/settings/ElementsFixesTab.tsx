@@ -12,7 +12,7 @@ import { useEmployes } from "@/hooks/api";
 import { useEmployeeRubriques, usePayRules } from "@/hooks/paie";
 import { apiClient, getUserErrorMessage } from "@/lib/fetcher";
 import { localDateISO } from "@/lib/date-local";
-import { formatMontant, type EmployeeRubrique } from "@/lib/types-paie";
+import { formatMontant, formatTaux, type EmployeeRubrique } from "@/lib/types-paie";
 
 type Draft = { id: number | null; payRuleId: number; montant: string; taux: string; dateDebut: string; dateFin: string };
 
@@ -137,7 +137,7 @@ export default function ElementsFixesTab({ canWrite }: { canWrite: boolean }) {
                         <td className="px-3 py-2 text-slate-900">{ruleLabel(el)}</td>
                         <td className="px-3 py-2 text-right font-mono">{formatMontant(el.montant)}</td>
                         <td className="px-3 py-2 text-right font-mono">
-                          {el.taux != null ? el.taux.toLocaleString("fr-FR", { maximumFractionDigits: 4 }) : ""}
+                          {formatTaux(el.taux)}
                         </td>
                         <td className="px-3 py-2">{fmtDate(el.dateDebut)}</td>
                         <td className="px-3 py-2">{el.dateFin ? fmtDate(el.dateFin) : "—"}</td>
@@ -187,7 +187,7 @@ export default function ElementsFixesTab({ canWrite }: { canWrite: boolean }) {
               <Field label="Montant (F)">
                 <Input inputMode="numeric" value={draft.montant} className="font-mono" onChange={(e) => setDraft({ ...draft, montant: e.target.value })} />
               </Field>
-              <Field label="Taux" hint="0,05 = 5 %">
+              <Field label="Taux" hint="En % : 5 = 5 %">
                 <Input inputMode="decimal" value={draft.taux} className="font-mono" onChange={(e) => setDraft({ ...draft, taux: e.target.value })} />
               </Field>
               <Field label="Date de début" required>

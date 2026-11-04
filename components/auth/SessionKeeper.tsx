@@ -7,6 +7,12 @@ import { getAccessToken, trySilentRefresh } from "@/lib/authClient";
 import { shouldRefreshAccessToken } from "@/lib/session";
 
 const PUBLIC_PATHS = new Set(["/", "/login"]);
+/** Pages publiques à préfixe (vérification QR d'un bulletin). */
+const PUBLIC_PREFIXES = ["/verify/"];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.has(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+}
 
 /** Intervalle de vérification pendant que l'app est au premier plan (JWT courts ~2–15 min). */
 const CHECK_INTERVAL_MS = 60_000;
@@ -20,7 +26,7 @@ export default function SessionKeeper() {
   const refreshingRef = useRef(false);
 
   useEffect(() => {
-    if (!isAuthenticated || PUBLIC_PATHS.has(pathname)) return;
+    if (!isAuthenticated || isPublicPath(pathname)) return;
 
     const runRefresh = async () => {
       if (refreshingRef.current) return;

@@ -24,13 +24,9 @@ import {
   normalizeAbsenceList,
   unwrapAbsenceListPayload,
 } from "@/lib/absence-utils";
-import { normalizeBudgetSynthese } from "@/lib/budget-utils";
 import { normalizeStatistiquesSynthese } from "@/lib/statistiques-utils";
 import { localDateISO } from "@/lib/date-local";
 import {
-  normalizeBudgetCategorieList,
-  normalizeBudgetDepenseList,
-  normalizeBudgetEnveloppeList,
   normalizeCandidatureList,
   normalizeCompetenceList,
   normalizeEvaluationList,
@@ -56,10 +52,6 @@ import type {
   DepartementsRepartition,
   PaieEvolutionPoint,
   StatistiquesSynthese,
-  BudgetCategorie,
-  BudgetEnveloppe,
-  BudgetDepense,
-  BudgetSynthese,
 } from "@/lib/types";
 
 const SHORT = { refreshInterval: 0, revalidateOnFocus: false } as const;
@@ -408,51 +400,6 @@ export function useStatistiquesSynthese() {
     AUTO
   );
   return { synthese: data, isLoading, error, mutate };
-}
-
-export function useBudgetSynthese(annee?: number) {
-  const url = `/budget/synthese${qs({ annee })}`;
-  const { data, error, isLoading, mutate } = useSWR<BudgetSynthese>(
-    url,
-    async () => normalizeBudgetSynthese(await fetcher<unknown>(url), annee),
-    SHORT
-  );
-  return { synthese: data, isLoading, error, mutate };
-}
-
-export function useBudgetCategories() {
-  const { data, error, isLoading, mutate } = useSWR<BudgetCategorie[]>(
-    "/budget/categories",
-    async (u: string) => normalizeBudgetCategorieList(await fetcher<unknown>(u)),
-    SHORT
-  );
-  return { categories: data ?? [], isLoading, error, mutate };
-}
-
-export function useBudgetEnveloppes(filters?: { annee?: number; statut?: string }) {
-  const url = `/budget/enveloppes${qs(filters ?? {})}`;
-  const { data, error, isLoading, mutate } = useSWR<BudgetEnveloppe[]>(
-    url,
-    async (u: string) => normalizeBudgetEnveloppeList(await fetcher<unknown>(u)),
-    SHORT
-  );
-  return { enveloppes: data ?? [], isLoading, error, mutate };
-}
-
-export function useBudgetDepenses(filters?: {
-  enveloppe_id?: number;
-  categorie_id?: number;
-  statut?: string;
-  date_from?: string;
-  date_to?: string;
-}) {
-  const url = `/budget/depenses${qs(filters ?? {})}`;
-  const { data, error, isLoading, mutate } = useSWR<BudgetDepense[]>(
-    url,
-    async (u: string) => normalizeBudgetDepenseList(await fetcher<unknown>(u)),
-    SHORT
-  );
-  return { depenses: data ?? [], isLoading, error, mutate };
 }
 
 // ============ Dashboard ============

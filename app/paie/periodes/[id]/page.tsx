@@ -65,14 +65,27 @@ export default function PeriodeDetailPage({ params }: { params: Promise<{ id: st
   async function run(action: "calculer" | "valider" | "payer" | "cloturer", body?: unknown) {
     setBusy(true);
     try {
-      await paieActions.periodeAction(id, action, body);
+      const res = (await paieActions.periodeAction(id, action, body)) as Record<string, unknown> | null;
+      const count = (k: string) => (Array.isArray(res?.[k]) ? (res![k] as unknown[]).length : 0);
       const messages = {
-        calculer: "Bulletins calculés",
-        valider: "Période validée",
+        calculer: `Bulletins calculés : ${Number(res?.calcules ?? 0)}`,
+        valider: `Bulletins validés : ${Number(res?.valides ?? 0)}`,
         payer: "Période marquée payée",
         cloturer: "Période clôturée",
       };
       toast.success(messages[action]);
+      if (count("erreurs") > 0) {
+        const erreurs = res!.erreurs as Array<{ nom?: string; message?: string }>;
+        toast.error(`${erreurs.length} bulletin(s) en erreur : ${erreurs.map((e) => `${e.nom} (${e.message})`).join(" ; ")}`);
+      }
+      if (count("ignoresAutoValidation") > 0) {
+        toast.warning(
+          `${count("ignoresAutoValidation")} bulletin(s) vous concernant non validé(s) : un autre membre RH ou administrateur doit les valider.`
+        );
+      }
+      if (count("archivageEchoue") > 0) {
+        toast.warning(`${count("archivageEchoue")} PDF non archivé(s) : vérifier la configuration du stockage.`);
+      }
       setConfirm(null);
       setPayOpen(false);
       await mutate();

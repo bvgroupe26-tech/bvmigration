@@ -75,19 +75,31 @@ export function canRoleAccessPath(
   employeId?: number | null
 ): boolean {
   if (pathname === "/" || pathname === "/login" || pathname === "/offline") return true;
+  if (pathname.startsWith("/verify/")) return true;
   const normalized = normalizeAppRole(role);
   if (!normalized) return false;
   if (isEmployeePath(pathname)) return hasEmployeePanelAccess(normalized, employeId);
   if (!hasAdminPanelAccess(normalized)) return false;
-  if (normalized === "manager" && isHrOnlyPath(pathname)) return false;
+  if (normalized === "manager" && isHrOnlyPath(pathname) && !isManagerException(pathname)) return false;
   return true;
 }
 
-/** Modules réservés admin/rh côté API (le manager reçoit 403). */
-const HR_ONLY_PREFIXES = ["/paie", "/budget", "/administration"];
+/** Modules réservés admin/rh côté API (le manager reçoit 403). `/parametres/finance` : rh en lecture seule. */
+const HR_ONLY_PREFIXES = ["/paie", "/budget", "/administration", "/parametres"];
+
+/** Le manager valide les dépenses en N1 : liste et détail, sans vue d'ensemble ni référentiels. */
+const MANAGER_EXCEPTIONS = ["/budget/depenses"];
+
+function matchesPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
 
 function isHrOnlyPath(pathname: string): boolean {
-  return HR_ONLY_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  return HR_ONLY_PREFIXES.some((p) => matchesPrefix(pathname, p));
+}
+
+function isManagerException(pathname: string): boolean {
+  return MANAGER_EXCEPTIONS.some((p) => matchesPrefix(pathname, p));
 }
 
 export function filterNavForRole<T extends { href: string }>(

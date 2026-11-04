@@ -90,7 +90,7 @@ export default function ParametresTab({ canWrite, onSaved }: { canWrite: boolean
             Taux, plafonds et montants utilisés par les rubriques. Chaque modification crée une nouvelle valeur avec sa
             date d&apos;effet ; l&apos;historique est conservé pour recalculer correctement les anciennes périodes.
           </p>
-          <p>Les taux se saisissent en décimal : 0,04 = 4 %.</p>
+          <p>Les taux se saisissent en pourcentage : 4 = 4 %. Une valeur 0 est valide (par exemple « pas de plafond »).</p>
         </div>
         {canWrite && (
           <Button
@@ -213,7 +213,7 @@ export default function ParametresTab({ canWrite, onSaved }: { canWrite: boolean
                   onChange={(e) => setDraft({ ...draft, code: e.target.value })}
                 />
               </Field>
-              <Field label="Valeur" required hint="Taux : 0,04 = 4 %">
+              <Field label="Valeur" required hint="Taux en % : 4 = 4 %">
                 <Input
                   inputMode="decimal"
                   value={draft.valeur}
