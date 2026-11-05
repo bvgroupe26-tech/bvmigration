@@ -5,7 +5,7 @@ import { TOKEN_COOKIE_NAME } from "@/lib/auth";
 import { getTokenMaxAgeSeconds } from "@/lib/session";
 
 const DEFAULT_LOCAL_API = "http://127.0.0.1:3001";
-const DEFAULT_PROD_API = "https://bv-groupe.onrender.com";
+const DEFAULT_PROD_API = "https://bvback.onrender.com";
 
 export const REFRESH_COOKIE_NAME = "refresh_token";
 const TOKEN_MAX_AGE = 60 * 60 * 24 * 7;

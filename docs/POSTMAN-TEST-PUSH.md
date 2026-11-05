@@ -1,6 +1,6 @@
 # Tester les notifications push avec Postman
 
-**Base URL production :** `https://bv-groupe.onrender.com/api`
+**Base URL production :** `https://bvback.onrender.com/api`
 
 > Postman teste le **backend** (envoi). Pour recevoir l’alerte sur l’**écran du téléphone**, il faut d’abord un **abonnement réel** créé depuis l’app (Profil → Activer les notifications).
 
@@ -23,7 +23,7 @@
 | Champ | Valeur |
 |--------|--------|
 | Method | `GET` |
-| URL | `https://bv-groupe.onrender.com/api/push/vapid-public-key` |
+| URL | `https://bvback.onrender.com/api/push/vapid-public-key` |
 | Auth | Aucune |
 
 **Réponse attendue (200) :**
@@ -45,7 +45,7 @@ Si erreur 503 → `VAPID_PUBLIC_KEY` manquante sur Render.
 | Champ | Valeur |
 |--------|--------|
 | Method | `POST` |
-| URL | `https://bv-groupe.onrender.com/api/auth/login` |
+| URL | `https://bvback.onrender.com/api/auth/login` |
 | Headers | `Content-Type: application/json` |
 | Body (raw JSON) | voir ci-dessous |
 
@@ -103,7 +103,7 @@ SELECT * FROM push_subscriptions WHERE "userId" = VOTRE_ID;
 | Champ | Valeur |
 |--------|--------|
 | Method | `POST` |
-| URL | `https://bv-groupe.onrender.com/api/push/subscribe` |
+| URL | `https://bvback.onrender.com/api/push/subscribe` |
 | Authorization | Bearer `{{accessToken}}` |
 | Body | |
 
@@ -141,7 +141,7 @@ navigator.serviceWorker.ready.then(r =>
 | Champ | Valeur |
 |--------|--------|
 | Method | `GET` |
-| URL | `https://bv-groupe.onrender.com/api/push/status` |
+| URL | `https://bvback.onrender.com/api/push/status` |
 | Authorization | Bearer `{{accessToken}}` |
 
 Si `subscriptionCount` vaut **0**, `POST /push/test` renverra toujours `sent: 0` — activez les notifications dans l’app (Profil) avec le **même email** que le token Postman.
@@ -153,7 +153,7 @@ Si `subscriptionCount` vaut **0**, `POST /push/test` renverra toujours `sent: 0`
 | Champ | Valeur |
 |--------|--------|
 | Method | `POST` |
-| URL | `https://bv-groupe.onrender.com/api/push/test` |
+| URL | `https://bvback.onrender.com/api/push/test` |
 | Authorization | Bearer `{{accessToken}}` |
 | Body | *(vide)* |
 
@@ -175,7 +175,7 @@ Si `subscriptionCount` vaut **0**, `POST /push/test` renverra toujours `sent: 0`
 | Champ | Valeur |
 |--------|--------|
 | Method | `GET` |
-| URL | `https://bv-groupe.onrender.com/api/push/vapid-public-key` |
+| URL | `https://bvback.onrender.com/api/push/vapid-public-key` |
 
 Comparer avec `NEXT_PUBLIC_VAPID_PUBLIC_KEY` sur Vercel — **doit être identique** à `VAPID_PUBLIC_KEY` sur Render.
 
@@ -201,6 +201,6 @@ Créer une collection avec ces 3 requêtes :
 2. `Push - VAPID Public Key` → GET `/push/vapid-public-key`
 3. `Push - Test Notification` → POST `/push/test` (Bearer)
 
-Variable collection : `baseUrl` = `https://bv-groupe.onrender.com/api`
+Variable collection : `baseUrl` = `https://bvback.onrender.com/api`
 
 URLs : `{{baseUrl}}/auth/login`, `{{baseUrl}}/push/test`

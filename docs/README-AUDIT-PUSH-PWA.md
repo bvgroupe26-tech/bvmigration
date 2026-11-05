@@ -76,7 +76,7 @@ Documentation technique consolidée : audit architecture, problèmes détectés,
 
 ### Déploiement
 - Front : Vercel (`https://…vercel.app`)
-- API : Render (`https://bv-groupe.onrender.com/api`)
+- API : Render (`https://bvback.onrender.com/api`)
 
 ---
 
@@ -411,7 +411,7 @@ Déclare seulement `NODE_ENV=production`. **VAPID et FRONTEND_URL** doivent êtr
 ### Vercel
 
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
-- `API_PROXY_TARGET=https://bv-groupe.onrender.com`
+- `API_PROXY_TARGET=https://bvback.onrender.com`
 - **Ne pas** définir `DISABLE_PWA=true`
 
 ---
@@ -462,7 +462,7 @@ REFRESH_TOKEN_SECRET=
 
 ```env
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=   # = VAPID_PUBLIC_KEY Render
-API_PROXY_TARGET=https://bv-groupe.onrender.com
+API_PROXY_TARGET=https://bvback.onrender.com
 ```
 
 ### Validation au démarrage

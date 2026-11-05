@@ -53,7 +53,7 @@ bv-groupe-rh/
 └── app/manifest.ts         # Web App Manifest dynamique
 ```
 
-**Backend API :** NestJS sur Render (`https://bv-groupe.onrender.com`), proxifié via `/api/nest/*` et `/api/auth/*` (BFF Next).
+**Backend API :** NestJS sur Render (`https://bvback.onrender.com`), proxifié via `/api/nest/*` et `/api/auth/*` (BFF Next).
 
 ---
 

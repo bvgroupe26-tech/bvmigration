@@ -4,7 +4,7 @@
  * - Côté serveur Node : URL absolue (Render en prod, localhost en dev).
  */
 const DEFAULT_LOCAL_API = "http://127.0.0.1:3001";
-const DEFAULT_PROD_API = "https://bv-groupe.onrender.com";
+const DEFAULT_PROD_API = "https://bvback.onrender.com";
 
 export function resolveApiBaseUrl(): string {
   const fallbackTarget =

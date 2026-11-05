@@ -52,7 +52,7 @@ Service Worker (/sw.js)
 
 **URLs production :**
 - Front : Vercel (proxy `/api/nest/*` → Render)
-- API : `https://bv-groupe.onrender.com/api`
+- API : `https://bvback.onrender.com/api`
 
 ---
 
@@ -336,7 +336,7 @@ fetch('/sw.js').then(r => r.text()).then(t =>
 
 ## 8. Tests Postman (résumé)
 
-**Base :** `https://bv-groupe.onrender.com/api`
+**Base :** `https://bvback.onrender.com/api`
 
 ```
 1. POST /auth/login          → accessToken + noter user.id
@@ -435,7 +435,7 @@ FRONTEND_URL=https://votre-app.vercel.app
 
 ```
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=   # = VAPID_PUBLIC_KEY Render
-API_PROXY_TARGET=https://bv-groupe.onrender.com
+API_PROXY_TARGET=https://bvback.onrender.com
 ```
 
 ### À ne pas activer en prod

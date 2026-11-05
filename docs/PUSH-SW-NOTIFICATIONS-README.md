@@ -1435,7 +1435,7 @@ const withPWA = withPWAInit({
 });
 
 const DEFAULT_LOCAL_API = "http://127.0.0.1:3001";
-const DEFAULT_PROD_API = "https://bv-groupe.onrender.com";
+const DEFAULT_PROD_API = "https://bvback.onrender.com";
 
 const apiProxyTarget =
   process.env.API_PROXY_TARGET ??

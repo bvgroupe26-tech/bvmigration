@@ -10,7 +10,7 @@ La PWA est activée sur l'application racine (manifest + offline fallback).
 
 | Environnement | URL backend | Swagger |
 |---------------|-------------|---------|
-| **Production** | `https://bv-groupe.onrender.com/api` | [/api/docs](https://bv-groupe.onrender.com/api/docs) |
+| **Production** | `https://bvback.onrender.com/api` | [/api/docs](https://bvback.onrender.com/api/docs) |
 | **Local** | `http://127.0.0.1:3001/api` | `http://127.0.0.1:3001/api/docs` |
 
 Le frontend appelle toujours `/api/nest/*` dans le navigateur ; Next.js proxifie vers le backend via `API_PROXY_TARGET`.
@@ -18,8 +18,8 @@ Le frontend appelle toujours `/api/nest/*` dans le navigateur ; Next.js proxifie
 Variables dans `.env.local` (voir `.env.example`) :
 
 ```bash
-API_PROXY_TARGET=https://bv-groupe.onrender.com
-NEXT_PUBLIC_API_URL=https://bv-groupe.onrender.com/api
+API_PROXY_TARGET=https://bvback.onrender.com
+NEXT_PUBLIC_API_URL=https://bvback.onrender.com/api
 ```
 
 Après modification des variables, redémarrer `npm run dev`.
