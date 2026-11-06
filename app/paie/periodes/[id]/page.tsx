@@ -3,7 +3,7 @@
 import { use, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Calculator, CheckCircle2, Banknote, Lock, RefreshCcw } from "lucide-react";
+import { ArrowLeft, Calculator, CheckCircle2, Banknote, Lock, RefreshCcw, UserRound } from "lucide-react";
 import Button from "@/components/ui/Button";
 import GlassCard from "@/components/ui/GlassCard";
 import Modal from "@/components/ui/Modal";
@@ -13,9 +13,10 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { Field, Input, NativeSelect } from "@/components/ui/Field";
 import PeriodeStepper from "@/components/paie/PeriodeStepper";
 import PeriodeVariablesTab from "@/components/paie/PeriodeVariablesTab";
-import PeriodeBulletinsTab from "@/components/paie/PeriodeBulletinsTab";
+import PeriodeBulletinsTab, { type BulletinRowAction } from "@/components/paie/PeriodeBulletinsTab";
 import PaieSettingsBanner from "@/components/paie/PaieSettingsBanner";
 import { usePayrollPeriod, usePaieSettingsStatut, paieActions } from "@/hooks/paie";
+import { useEmployes } from "@/hooks/api";
 import { getUserErrorMessage } from "@/lib/fetcher";
 import { localDateISO } from "@/lib/date-local";
 import {
@@ -61,6 +62,11 @@ export default function PeriodeDetailPage({ params }: { params: Promise<{ id: st
   const [datePaiement, setDatePaiement] = useState(localDateISO());
   const [modePaiement, setModePaiement] = useState<ModePaiement | "">("");
   const [busy, setBusy] = useState(false);
+  // Employé ciblé (un seul bulletin) pour calculer / valider / payer ; undefined = toute la période.
+  const [scope, setScope] = useState<{ employeId: number; nom: string } | null>(null);
+  const [pickOpen, setPickOpen] = useState(false);
+  const [pickedId, setPickedId] = useState("");
+  const { employes } = useEmployes({ statut: "actif" });
 
   async function run(action: "calculer" | "valider" | "payer" | "cloturer", body?: unknown) {
     setBusy(true);
@@ -70,10 +76,19 @@ export default function PeriodeDetailPage({ params }: { params: Promise<{ id: st
       const messages = {
         calculer: `Bulletins calculés : ${Number(res?.calcules ?? 0)}`,
         valider: `Bulletins validés : ${Number(res?.valides ?? 0)}`,
-        payer: "Période marquée payée",
+        payer: `Bulletins payés : ${Number(res?.payes ?? 0)}`,
         cloturer: "Période clôturée",
       };
       toast.success(messages[action]);
+      if (count("ignores") > 0) {
+        const ignores = res!.ignores as Array<{ nom?: string; raison?: string }>;
+        // Pour un seul employé, la raison est l'information utile (non éligible, déjà validé…).
+        toast.warning(
+          scope || ignores.length <= 3
+            ? `Non calculé : ${ignores.map((i) => `${i.nom} (${i.raison})`).join(" ; ")}`
+            : `${ignores.length} employé(s) ignoré(s) (non éligibles ou déjà validés).`
+        );
+      }
       if (count("erreurs") > 0) {
         const erreurs = res!.erreurs as Array<{ nom?: string; message?: string }>;
         toast.error(`${erreurs.length} bulletin(s) en erreur : ${erreurs.map((e) => `${e.nom} (${e.message})`).join(" ; ")}`);
@@ -88,12 +103,31 @@ export default function PeriodeDetailPage({ params }: { params: Promise<{ id: st
       }
       setConfirm(null);
       setPayOpen(false);
+      setPickOpen(false);
+      setScope(null);
       await mutate();
     } catch (err) {
       toast.error(getUserErrorMessage(err));
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Corps de la requête : cible un employé si une sélection est active. */
+  const withScope = (body?: Record<string, unknown>) => (scope ? { ...body, employeIds: [scope.employeId] } : body);
+
+  function handleRowAction(action: BulletinRowAction, row: { employeId: number; employePrenom: string; employeNom: string }) {
+    setScope({ employeId: row.employeId, nom: `${row.employePrenom} ${row.employeNom}`.trim() });
+    if (action === "payer") setPayOpen(true);
+    else if (action === "valider") setConfirm("valider");
+    else void run("calculer", { employeIds: [row.employeId] });
+  }
+
+  function closeDialogs() {
+    setConfirm(null);
+    setPayOpen(false);
+    setPickOpen(false);
+    setScope(null);
   }
 
   if (isLoading) return <Skeleton className="h-96 w-full" />;
@@ -110,7 +144,13 @@ export default function PeriodeDetailPage({ params }: { params: Promise<{ id: st
 
   const s = periode.statut;
   const moteurPret = Boolean(settings?.pret);
-  const variablesEditable = s === "ouverte" || s === "calculee";
+  const variablesEditable = s !== "cloturee";
+  const compteurs = periode.compteurs;
+  const nbCalcules = compteurs?.calcule ?? 0;
+  const nbValides = compteurs?.valide ?? 0;
+  const dejaTraites = new Set(
+    periode.bulletins.filter((b) => b.type === "normal" && b.statut !== "annule").map((b) => b.employeId)
+  );
 
   return (
     <div className="space-y-5">
@@ -144,14 +184,39 @@ export default function PeriodeDetailPage({ params }: { params: Promise<{ id: st
               {s === "ouverte" ? "Calculer" : "Recalculer"}
             </Button>
           )}
-          {s === "calculee" && (
-            <Button variant="primary" icon={<CheckCircle2 className="h-4 w-4" />} onClick={() => setConfirm("valider")}>
-              Valider
+          {s !== "cloturee" && (
+            <Button
+              variant="secondary"
+              icon={<UserRound className="h-4 w-4" />}
+              onClick={() => setPickOpen(true)}
+              disabled={!moteurPret}
+              title={!moteurPret ? "Paramétrage incomplet" : "Calculer le bulletin d'un seul employé"}
+            >
+              Calculer un employé
             </Button>
           )}
-          {s === "validee" && (
-            <Button variant="success" icon={<Banknote className="h-4 w-4" />} onClick={() => setPayOpen(true)}>
-              Payer
+          {nbCalcules > 0 && (
+            <Button
+              variant="primary"
+              icon={<CheckCircle2 className="h-4 w-4" />}
+              onClick={() => {
+                setScope(null);
+                setConfirm("valider");
+              }}
+            >
+              Valider{nbCalcules > 0 ? ` (${nbCalcules})` : ""}
+            </Button>
+          )}
+          {nbValides > 0 && (
+            <Button
+              variant="success"
+              icon={<Banknote className="h-4 w-4" />}
+              onClick={() => {
+                setScope(null);
+                setPayOpen(true);
+              }}
+            >
+              Payer ({nbValides})
             </Button>
           )}
           {s === "payee" && (
@@ -166,7 +231,7 @@ export default function PeriodeDetailPage({ params }: { params: Promise<{ id: st
         <PeriodeStepper statut={s} />
       </GlassCard>
 
-      {!moteurPret && (s === "ouverte" || s === "calculee") && <PaieSettingsBanner statut={settings} />}
+      {!moteurPret && s !== "cloturee" && s !== "payee" && <PaieSettingsBanner statut={settings} />}
 
       <div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 text-sm shadow-sm sm:inline-flex">
         {(["bulletins", "variables"] as Tab[]).map((t) => (
@@ -185,7 +250,7 @@ export default function PeriodeDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {tab === "bulletins" ? (
-        <PeriodeBulletinsTab periode={periode} />
+        <PeriodeBulletinsTab periode={periode} onRowAction={handleRowAction} busy={busy} calculPossible={moteurPret} />
       ) : (
         <PeriodeVariablesTab periodId={periode.id} editable={variablesEditable} onChanged={() => void mutate()} />
       )}
@@ -193,21 +258,60 @@ export default function PeriodeDetailPage({ params }: { params: Promise<{ id: st
       {confirm && (
         <ConfirmDialog
           open
-          onClose={() => setConfirm(null)}
-          onConfirm={() => run(confirm)}
+          onClose={closeDialogs}
+          onConfirm={() => run(confirm, confirm === "cloturer" ? undefined : withScope())}
           loading={busy}
           variant={confirm === "cloturer" ? "danger" : "warning"}
-          title={CONFIRM_TEXT[confirm].title}
+          title={scope ? `${CONFIRM_TEXT[confirm].title.replace(" de la période", "").replace(" la période", "")} — ${scope.nom}` : CONFIRM_TEXT[confirm].title}
           description={CONFIRM_TEXT[confirm].description}
           confirmLabel={CONFIRM_TEXT[confirm].label}
           cancelLabel="Retour"
         />
       )}
 
-      <Modal open={payOpen} onClose={() => setPayOpen(false)} title="Payer la période" size="sm">
+      <Modal open={pickOpen} onClose={closeDialogs} title="Calculer le bulletin d'un employé" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
-            Tous les bulletins validés passent au statut « payé » et deviennent visibles dans l&apos;espace de chaque employé.
+            Seul le bulletin de l&apos;employé choisi est calculé (ou recalculé s&apos;il n&apos;est pas encore validé). Les autres bulletins de la
+            période ne changent pas.
+          </p>
+          <Field label="Employé" required>
+            <NativeSelect value={pickedId} onChange={(e) => setPickedId(e.target.value)}>
+              <option value="">Choisir un employé…</option>
+              {employes.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nom} {e.prenom}
+                  {dejaTraites.has(e.id) ? " — bulletin existant" : ""}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={closeDialogs} disabled={busy}>
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              loading={busy}
+              disabled={!pickedId}
+              onClick={() => {
+                const emp = employes.find((e) => String(e.id) === pickedId);
+                if (emp) setScope({ employeId: emp.id, nom: `${emp.prenom} ${emp.nom}`.trim() });
+                void run("calculer", { employeIds: [Number(pickedId)] });
+              }}
+            >
+              Calculer
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={payOpen} onClose={closeDialogs} title={scope ? `Payer ${scope.nom}` : "Payer les bulletins validés"} size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            {scope
+              ? "Ce bulletin passe au statut « payé » et devient visible dans l'espace de l'employé."
+              : "Tous les bulletins validés passent au statut « payé » et deviennent visibles dans l'espace de chaque employé."}
           </p>
           <Field label="Date de paiement" required>
             <Input type="date" value={datePaiement} onChange={(e) => setDatePaiement(e.target.value)} />
@@ -223,14 +327,14 @@ export default function PeriodeDetailPage({ params }: { params: Promise<{ id: st
             </NativeSelect>
           </Field>
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setPayOpen(false)} disabled={busy}>
+            <Button variant="ghost" onClick={closeDialogs} disabled={busy}>
               Annuler
             </Button>
             <Button
               variant="success"
               loading={busy}
               disabled={!datePaiement}
-              onClick={() => run("payer", { datePaiement, modePaiement: modePaiement || undefined })}
+              onClick={() => run("payer", withScope({ datePaiement, modePaiement: modePaiement || undefined }))}
             >
               Confirmer le paiement
             </Button>

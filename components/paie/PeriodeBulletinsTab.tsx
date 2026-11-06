@@ -6,7 +6,8 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import GlassCard from "@/components/ui/GlassCard";
 import KPICard from "@/components/ui/KPICard";
 import StatBadge from "@/components/ui/StatBadge";
-import { Wallet, Users, Landmark, Receipt } from "lucide-react";
+import Button from "@/components/ui/Button";
+import { Wallet, Users, Landmark, Receipt, RefreshCcw, CheckCircle2, Banknote } from "lucide-react";
 import {
   BULLETIN_STATUT_LABELS,
   BULLETIN_TYPE_LABELS,
@@ -16,8 +17,20 @@ import {
   type PeriodBulletinRow,
 } from "@/lib/types-paie";
 
-export default function PeriodeBulletinsTab({ periode }: { periode: PayrollPeriod }) {
+export type BulletinRowAction = "calculer" | "valider" | "payer";
+
+type Props = {
+  periode: PayrollPeriod;
+  /** Traitement d'un seul employé : calculer, valider ou payer son bulletin. */
+  onRowAction?: (action: BulletinRowAction, row: PeriodBulletinRow) => void;
+  busy?: boolean;
+  /** Le calcul v2 n'est possible que si le paramétrage de paie est complet. */
+  calculPossible?: boolean;
+};
+
+export default function PeriodeBulletinsTab({ periode, onRowAction, busy = false, calculPossible = true }: Props) {
   const c = periode.compteurs;
+  const modifiable = periode.statut !== "cloturee" && Boolean(onRowAction);
 
   const columns: Column<PeriodBulletinRow>[] = [
     {
@@ -72,14 +85,53 @@ export default function PeriodeBulletinsTab({ periode }: { periode: PayrollPerio
       key: "actions",
       header: "",
       align: "right",
-      render: (b) => (
-        <Link
-          href={`/paie/${b.id}`}
-          className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-text-secondary transition hover:bg-slate-100 hover:text-slate-900"
-        >
-          Voir
-        </Link>
-      ),
+      render: (b) => {
+        const v2Normal = b.moteur === "v2" && b.type === "normal";
+        const recalculable = v2Normal && (b.statut === "brouillon" || b.statut === "calcule");
+        return (
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
+            {modifiable && recalculable && (
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<RefreshCcw className="h-3.5 w-3.5" />}
+                disabled={busy || !calculPossible}
+                onClick={() => onRowAction!("calculer", b)}
+              >
+                Recalculer
+              </Button>
+            )}
+            {modifiable && v2Normal && b.statut === "calcule" && (
+              <Button
+                size="sm"
+                variant="primary"
+                icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+                disabled={busy}
+                onClick={() => onRowAction!("valider", b)}
+              >
+                Valider
+              </Button>
+            )}
+            {modifiable && b.statut === "valide" && (
+              <Button
+                size="sm"
+                variant="success"
+                icon={<Banknote className="h-3.5 w-3.5" />}
+                disabled={busy}
+                onClick={() => onRowAction!("payer", b)}
+              >
+                Payer
+              </Button>
+            )}
+            <Link
+              href={`/paie/${b.id}`}
+              className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-text-secondary transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              Voir
+            </Link>
+          </div>
+        );
+      },
     },
   ];
 
