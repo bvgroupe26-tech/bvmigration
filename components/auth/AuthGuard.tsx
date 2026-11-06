@@ -99,7 +99,9 @@ export default function AuthGuard({ children, allowedRoles, redirectTo }: AuthGu
     userHome,
   ]);
 
-  if (isLoading) {
+  // Profil en cache : on affiche l'interface tout de suite et la session se revérifie en arrière-plan
+  // (un serveur Render endormi peut mettre plus de 30 s à répondre). Sans profil, on attend.
+  if (isLoading && !(isAuthenticated && user)) {
     return <AuthLoading />;
   }
 

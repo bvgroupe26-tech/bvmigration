@@ -15,13 +15,16 @@ export default function WelcomeSplash() {
   const [canLeave, setCanLeave] = useState(false);
   const startedAt = useRef<number | null>(null);
 
+  const hasCachedUser = isAuthenticated && Boolean(user);
+
   useEffect(() => {
     startedAt.current ??= Date.now();
-    if (isLoading) return;
+    // Profil en cache : inutile d'attendre la vérification serveur (serveur endormi = 30 s et plus).
+    if (isLoading && !hasCachedUser) return;
     const wait = Math.max(0, MIN_DISPLAY_MS - (Date.now() - startedAt.current));
     const timer = window.setTimeout(() => setCanLeave(true), wait);
     return () => clearTimeout(timer);
-  }, [isLoading]);
+  }, [isLoading, hasCachedUser]);
 
   useEffect(() => {
     if (!canLeave) return;
