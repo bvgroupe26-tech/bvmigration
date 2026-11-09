@@ -21,10 +21,38 @@ const loginSchema = z.object({
 
 type LoginInput = z.infer<typeof loginSchema>;
 
+/**
+ * Poste partagé : le navigateur ne doit ni pré-remplir ni proposer d'enregistrer les identifiants.
+ * Désactivable avec NEXT_PUBLIC_ALLOW_PASSWORD_MANAGER=1 (gestionnaire de mots de passe autorisé).
+ */
+const BLOCK_PASSWORD_MANAGER = process.env.NEXT_PUBLIC_ALLOW_PASSWORD_MANAGER !== "1";
+
+/** Consignes aux gestionnaires courants (LastPass, 1Password, Bitwarden, Dashlane). */
+const NO_MANAGER_ATTRS = BLOCK_PASSWORD_MANAGER
+  ? ({
+      "data-lpignore": "true",
+      "data-1p-ignore": "true",
+      "data-bwignore": "true",
+      "data-form-type": "other",
+    } as const)
+  : {};
+
+type GuardedField = "email" | "password";
+
 export default function LoginForm() {
   const searchParams = useSearchParams();
   const { login } = useAuth();
   const [showPwd, setShowPwd] = useState(false);
+  // Champ en lecture seule jusqu'au premier clic : le remplissage automatique du navigateur n'y écrit pas.
+  const [touched, setTouched] = useState<Record<GuardedField, boolean>>({ email: false, password: false });
+  const guard = (field: GuardedField) =>
+    BLOCK_PASSWORD_MANAGER
+      ? {
+          readOnly: !touched[field],
+          onFocus: () => setTouched((t) => (t[field] ? t : { ...t, [field]: true })),
+          ...NO_MANAGER_ATTRS,
+        }
+      : {};
 
   const {
     register,
@@ -60,7 +88,7 @@ export default function LoginForm() {
   });
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form onSubmit={onSubmit} className="space-y-5" autoComplete={BLOCK_PASSWORD_MANAGER ? "off" : undefined}>
       {noPublicSignup ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
           L&apos;inscription en ligne n&apos;est pas disponible. Votre compte est créé par le service RH.
@@ -72,9 +100,10 @@ export default function LoginForm() {
           <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             type="email"
-            autoComplete="email"
+            autoComplete={BLOCK_PASSWORD_MANAGER ? "off" : "email"}
             placeholder="vous@entreprise.com"
             className="!pl-11"
+            {...guard("email")}
             {...register("email")}
           />
         </div>
@@ -85,9 +114,11 @@ export default function LoginForm() {
           <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             type={showPwd ? "text" : "password"}
-            autoComplete="current-password"
+            // « new-password » : Chrome n'y propose pas les mots de passe enregistrés (il ignore « off »).
+            autoComplete={BLOCK_PASSWORD_MANAGER ? "new-password" : "current-password"}
             placeholder="••••••••"
             className="!pl-11 !pr-11"
+            {...guard("password")}
             {...register("password")}
           />
           <button
